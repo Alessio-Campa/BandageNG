@@ -32,6 +32,8 @@
 #include "ui/dialogs/graphinfodialog.h"
 #include "ui/dialogs/pathlistdialog.h"
 #include "ui/dialogs/walklistdialog.h"
+#include "ui/dialogs/tagvaluecoloursdialog.h"
+#include "ui/dialogs/conditionalcoloursdialog.h"
 
 #include "graph/assemblygraph.h"
 #include "graph/debruijnnode.h"
@@ -230,6 +232,8 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     connect(ui->actionSave_selected_node_path_to_FASTA, SIGNAL(triggered(bool)), this, SLOT(saveSelectedPathToFile()));
     connect(ui->coloursComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(switchColourScheme()));
     connect(ui->tagsComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(switchTagValue()));
+    connect(ui->tagColoursButton, &QPushButton::clicked, this, &MainWindow::openTagColoursDialog);
+    connect(ui->conditionalColoursButton, &QPushButton::clicked, this, &MainWindow::openConditionalColoursDialog);
     connect(ui->actionSave_image_current_view, SIGNAL(triggered()), this, SLOT(saveImageCurrentView()));
     connect(ui->actionSave_image_entire_scene, SIGNAL(triggered()), this, SLOT(saveImageEntireScene()));
     connect(ui->actionExport_layout, SIGNAL(triggered()), this, SLOT(exportGraphLayout()));
@@ -1539,6 +1543,7 @@ void MainWindow::switchTagValue() {
             colorer->setColumnIdx(ui->tagsComboBox->currentIndex());
     }
 
+    updateColourSchemeControls();
     resetAllNodeColours();
 }
 
@@ -1573,9 +1578,74 @@ void MainWindow::switchColourScheme(int idx) {
         ui->tagsComboBox->setVisible(false);
     }
 
+    updateColourSchemeControls();
     resetAllNodeColours();
 }
 
+
+
+void MainWindow::updateColourSchemeControls()
+{
+    if (!g_settings->nodeColorer)
+        return;
+
+    const NodeColorScheme scheme = g_settings->nodeColorer->scheme();
+    const bool tagScheme = scheme == TAG_VALUE;
+    const bool conditionalScheme = scheme == CONDITIONAL_COLOURS;
+
+    ui->tagColoursButton->setVisible(tagScheme);
+    ui->conditionalColoursButton->setVisible(conditionalScheme);
+
+    if (!tagScheme)
+        return;
+
+    auto *colorer = dynamic_cast<TagValueNodeColorer *>(&*g_settings->nodeColorer);
+    if (!colorer) {
+        ui->tagColoursButton->setEnabled(false);
+        return;
+    }
+
+    const size_t valueCount = colorer->valuesForTag(colorer->tagName()).size();
+    const bool canCustomise = valueCount > 0 &&
+                              valueCount <= size_t(TagValueNodeColorer::MaxCustomisableValues);
+
+    ui->tagColoursButton->setEnabled(canCustomise);
+    if (valueCount == 0) {
+        ui->tagColoursButton->setToolTip(tr("Select a GFA tag first."));
+    } else if (!canCustomise) {
+        ui->tagColoursButton->setToolTip(
+                tr("This tag has %1 values. Automatic palette colours are used when there are more than %2.")
+                        .arg(int(valueCount)).arg(TagValueNodeColorer::MaxCustomisableValues));
+    } else {
+        ui->tagColoursButton->setToolTip(QString());
+    }
+}
+
+
+void MainWindow::openTagColoursDialog()
+{
+    auto *colorer = dynamic_cast<TagValueNodeColorer *>(&*g_settings->nodeColorer);
+    if (!colorer)
+        return;
+
+    const size_t valueCount = colorer->valuesForTag(colorer->tagName()).size();
+    if (valueCount == 0 || valueCount > size_t(TagValueNodeColorer::MaxCustomisableValues))
+        return;
+
+    TagValueColoursDialog dialog(colorer, this);
+    if (dialog.exec() == QDialog::Accepted)
+        resetAllNodeColours();
+
+    updateColourSchemeControls();
+}
+
+
+void MainWindow::openConditionalColoursDialog()
+{
+    ConditionalColoursDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted)
+        resetAllNodeColours();
+}
 
 
 void MainWindow::determineContiguityFromSelectedNode() {

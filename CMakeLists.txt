@@ -55,6 +55,8 @@ set(LIB_SOURCES
     ui/dialogs/pathspecifydialog.cpp
     ui/dialogs/querypathsdialog.cpp
     ui/dialogs/settingsdialog.cpp
+    ui/dialogs/tagvaluecoloursdialog.cpp
+    ui/dialogs/conditionalcoloursdialog.cpp
     ui/widgets/verticallabel.cpp
     ui/widgets/verticalscrollarea.cpp
     ui/widgets/resizesplitter.cpp

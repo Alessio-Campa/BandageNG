@@ -21,6 +21,8 @@
 
 #include <QDialog>
 #include <QCloseEvent>
+#include <QColor>
+#include <QVector>
 
 class Settings;
 
@@ -43,9 +45,12 @@ private:
     Ui::SettingsDialog *ui;
 
     void loadOrSaveSettingsToOrFromWidgets(bool setWidgets, Settings * settings);
+    void populateTagColourPalette(const QVector<QColor> &palette);
+    [[nodiscard]] QVector<QColor> tagColourPaletteFromWidgets() const;
 
 private slots:
     void restoreDefaults();
+    void resetTagColourPalette();
     void enableDisableDepthWidgets();
     void nodeLengthPerMegabaseManualChanged();
     void updateNodeWidthVisualAid();

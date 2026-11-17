@@ -4489,6 +4489,84 @@ discrepancy (bases):</string>
         </widget>
        </item>
        <item>
+        <widget class="QLabel" name="tagColourPaletteHeadingLabel">
+         <property name="font">
+          <font>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Tag colour palette</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="tagColourPaletteDescriptionLabel">
+         <property name="text">
+          <string>These colours are used for automatic tag-value colouring in the 'Colour by GFA tag' scheme. Click a colour to change it.</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignJustify|Qt::AlignVCenter</set>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="Line" name="tagColourPaletteLine">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="tagColourPaletteWidget" native="true">
+         <layout class="QVBoxLayout" name="tagColourPaletteLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QWidget" name="tagColourPaletteColoursWidget" native="true">
+            <layout class="QGridLayout" name="tagColourPaletteGridLayout">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="resetTagColourPaletteButton">
+            <property name="focusPolicy">
+             <enum>Qt::StrongFocus</enum>
+            </property>
+            <property name="text">
+             <string>Reset palette to defaults</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
         <widget class="QLabel" name="recentFilesHeadingLabel">
          <property name="font">
           <font>

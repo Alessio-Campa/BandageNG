@@ -29,9 +29,12 @@
 #include <colormap/tinycolormap.hpp>
 #include "parallel_hashmap/phmap.h"
 
+#include <optional>
+#include <sstream>
 #include <unordered_set>
 
 #include <QApplication>
+#include <QRegularExpression>
 
 INodeColorer::INodeColorer(NodeColorScheme scheme)
     : m_graph(g_assemblyGraph), m_scheme(scheme) {
@@ -65,9 +68,59 @@ std::unique_ptr<INodeColorer> INodeColorer::create(NodeColorScheme scheme) {
             return std::make_unique<TagValueNodeColorer>(scheme);
         case CSV_COLUMN:
             return std::make_unique<CSVNodeColorer>(scheme);
+        case CONDITIONAL_COLOURS:
+            return std::make_unique<ConditionalNodeColorer>(scheme);
     }
 
     return nullptr;
+}
+
+namespace {
+
+std::string tagValueString(const gfa::tag &tag)
+{
+    std::stringstream stream;
+    std::visit([&](const auto &value) { stream << value; }, tag.val);
+    return stream.str();
+}
+
+std::string tagFullString(const gfa::tag &tag)
+{
+    return std::string(tag.name, 2) + ":" + tagValueString(tag);
+}
+
+std::optional<QColor> parseHexColour(const QString &text)
+{
+    static const QRegularExpression hexPattern(
+            QStringLiteral("^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"));
+
+    const QString value = text.trimmed();
+    if (!hexPattern.match(value).hasMatch())
+        return std::nullopt;
+
+    const QColor colour = QColor::fromString(value);
+    if (!colour.isValid())
+        return std::nullopt;
+
+    return colour;
+}
+
+bool ruleMatches(const QString &value, const TagColourRule &rule)
+{
+    switch (rule.matchType) {
+        case TagMatchType::Equals:
+            return value.compare(rule.value, Qt::CaseInsensitive) == 0;
+        case TagMatchType::Contains:
+            return value.contains(rule.value, Qt::CaseInsensitive);
+        case TagMatchType::StartsWith:
+            return value.startsWith(rule.value, Qt::CaseInsensitive);
+        case TagMatchType::EndsWith:
+            return value.endsWith(rule.value, Qt::CaseInsensitive);
+    }
+
+    return false;
+}
+
 }
 
 QColor DepthNodeColorer::get(const GraphicsItemNode *node) {
@@ -338,9 +391,9 @@ QColor TagValueNodeColorer::get(const GraphicsItemNode *node) {
     auto tags = m_graph->m_nodeTags.find(deBruijnNode);
     if (tags != m_graph->m_nodeTags.end()) {
         if (auto tag = gfa::getTag(m_tagName.c_str(), tags->second)) {
-            std::stringstream stream;
-            stream << *tag;
-            return m_allTags.at(stream.str());
+            const QColor colour = effectiveColour(m_tagName, tagValueString(*tag));
+            if (colour.isValid())
+                return colour;
         }
     }
 
@@ -348,34 +401,101 @@ QColor TagValueNodeColorer::get(const GraphicsItemNode *node) {
 }
 
 void TagValueNodeColorer::reset() {
+    const std::string previousTagName = m_tagName;
+
     m_allTags.clear();
     m_tagNames.clear();
+    m_tagValues.clear();
 
-    // Collect all tags and their corresponding values
+    // Collect all tags and their corresponding values.
     for (const auto &entry : m_graph->m_nodeTags) {
-        for (const auto &tag: entry.second) {
-            std::stringstream stream;
-            stream << tag;
-            std::string tagWithValue = stream.str();
-            std::string tagName{std::string_view(tag.name, 2)};
-            m_allTags.insert(tagWithValue, QColor());
+        for (const auto &tag : entry.second) {
+            const std::string tagName{std::string_view(tag.name, 2)};
+            const std::string value = tagValueString(tag);
+
+            m_allTags.insert(tagFullString(tag), QColor());
             m_tagNames.insert(tagName);
+            m_tagValues[tagName].insert(value);
         }
     }
 
-    // Assign colors
+    // Assign automatic colours from the configured palette.
+    const QVector<QColor> &palette = g_settings->tagColourPalette;
     for (const auto &tagName : m_tagNames) {
         auto tagRange = m_allTags.equal_prefix_range(tagName);
-        size_t sz = std::distance(tagRange.first, tagRange.second), i = 0;
+        size_t i = 0;
         for (auto it = tagRange.first; it != tagRange.second; ++it) {
-            *it = tinycolormap::GetColor(double(i) / double(sz),
-                                         colorMap(g_settings->colorMap)).ConvertToQColor();
+            if (palette.isEmpty())
+                *it = g_settings->defaultCustomNodeColour;
+            else
+                *it = palette[int(i % size_t(palette.size()))];
             i += 1;
         }
     }
 
-    if (!m_tagNames.empty())
-        m_tagName = *m_tagNames.begin();
+    const auto names = tagNames();
+    if (!previousTagName.empty() && m_tagNames.count(previousTagName))
+        m_tagName = previousTagName;
+    else if (!names.empty())
+        m_tagName = names.front();
+}
+
+std::vector<std::string> TagValueNodeColorer::valuesForTag(const std::string &tagName) const {
+    std::vector<std::string> values;
+    const auto it = m_tagValues.find(tagName);
+    if (it == m_tagValues.end())
+        return values;
+
+    values.assign(it->second.begin(), it->second.end());
+    std::sort(values.begin(), values.end());
+    return values;
+}
+
+QColor TagValueNodeColorer::automaticColour(const std::string &tagName, const std::string &value) const {
+    if (auto hexColour = parseHexColour(QString::fromStdString(value)))
+        return *hexColour;
+
+    const auto it = m_allTags.find(tagName + ":" + value);
+    if (it != m_allTags.end())
+        return *it;
+
+    return {};
+}
+
+QColor TagValueNodeColorer::effectiveColour(const std::string &tagName, const std::string &value) const {
+    const QString key = Settings::tagValueColourKey(QString::fromStdString(tagName),
+                                                    QString::fromStdString(value));
+    const auto overrideIt = g_settings->tagValueColours.find(key);
+    if (overrideIt != g_settings->tagValueColours.end())
+        return overrideIt.value();
+
+    return automaticColour(tagName, value);
+}
+
+bool TagValueNodeColorer::canCustomiseColours() const {
+    return valuesForTag(m_tagName).size() <= MaxCustomisableValues;
+}
+
+QColor ConditionalNodeColorer::get(const GraphicsItemNode *node) {
+    const DeBruijnNode *deBruijnNode = node->m_deBruijnNode;
+
+    const auto tags = m_graph->m_nodeTags.find(deBruijnNode);
+    if (tags != m_graph->m_nodeTags.end()) {
+        for (const auto &rule : g_settings->tagColourRules) {
+            if (rule.tagName.size() != 2)
+                continue;
+
+            const QByteArray tagName = rule.tagName.toUtf8();
+            const auto tag = gfa::getTag(tagName.constData(), tags->second);
+            if (!tag)
+                continue;
+
+            if (ruleMatches(QString::fromStdString(tagValueString(*tag)), rule) && rule.colour.isValid())
+                return rule.colour;
+        }
+    }
+
+    return g_settings->conditionalColour;
 }
 
 QColor CSVNodeColorer::get(const GraphicsItemNode *node) {

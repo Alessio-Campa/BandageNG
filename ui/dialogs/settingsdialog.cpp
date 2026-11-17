@@ -26,6 +26,8 @@
 #include "graph/assemblygraph.h"
 #include "graph/nodecolorer.h"
 
+#include <QGridLayout>
+#include <QLayoutItem>
 #include <QMessageBox>
 #include "ui_settingsdialog.h"
 
@@ -62,6 +64,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
     ui->recentFilesLimitComboBox->addItem("10", recentfiles::MaximumLimit);
 
     connect(ui->restoreDefaultsButton, SIGNAL(clicked()), this, SLOT(restoreDefaults()));
+    connect(ui->resetTagColourPaletteButton, SIGNAL(clicked()), this, SLOT(resetTagColourPalette()));
     connect(ui->depthValueManualRadioButton, SIGNAL(toggled(bool)), this, SLOT(enableDisableDepthWidgets()));
     connect(ui->nodeLengthPerMegabaseManualRadioButton, SIGNAL(toggled(bool)), this, SLOT(nodeLengthPerMegabaseManualChanged()));
     connect(ui->depthPowerSpinBox, SIGNAL(valueChanged(double)), this, SLOT(updateNodeWidthVisualAid()));
@@ -132,6 +135,8 @@ void SettingsDialog::setWidgetsFromSettings()
 {
     loadOrSaveSettingsToOrFromWidgets(true, g_settings.data());
 
+    populateTagColourPalette(g_settings->tagColourPalette);
+
     const int recentLimitIndex = ui->recentFilesLimitComboBox->findData(recentfiles::limit());
     if (recentLimitIndex >= 0)
         ui->recentFilesLimitComboBox->setCurrentIndex(recentLimitIndex);
@@ -145,6 +150,9 @@ void SettingsDialog::setWidgetsFromSettings()
 void SettingsDialog::setSettingsFromWidgets()
 {
     loadOrSaveSettingsToOrFromWidgets(false, g_settings.data());
+
+    if (const auto palette = tagColourPaletteFromWidgets(); !palette.isEmpty())
+        g_settings->tagColourPalette = palette;
 
     recentfiles::setLimit(ui->recentFilesLimitComboBox->currentData().toInt());
 
@@ -275,6 +283,54 @@ void SettingsDialog::loadOrSaveSettingsToOrFromWidgets(bool setWidgets, Settings
 }
 
 
+void SettingsDialog::populateTagColourPalette(const QVector<QColor> &palette)
+{
+    auto *layout = ui->tagColourPaletteGridLayout;
+
+    while (QLayoutItem *item = layout->takeAt(0)) {
+        if (QWidget *widget = item->widget())
+            widget->deleteLater();
+        delete item;
+    }
+
+    constexpr int columns = 10;
+    for (int i = 0; i < palette.size(); ++i) {
+        auto *button = new ColourButton(ui->tagColourPaletteColoursWidget);
+        button->m_name = "Tag colour";
+        button->setColour(palette[i]);
+        button->setFixedSize(28, 28);
+        button->setToolTip(QString("%1 (click to change)").arg(palette[i].name()));
+        layout->addWidget(button, i / columns, i % columns);
+    }
+}
+
+
+QVector<QColor> SettingsDialog::tagColourPaletteFromWidgets() const
+{
+    QVector<QColor> palette;
+
+    auto *layout = ui->tagColourPaletteGridLayout;
+    palette.reserve(layout->count());
+    for (int row = 0; row < layout->rowCount(); ++row) {
+        for (int column = 0; column < layout->columnCount(); ++column) {
+            const QLayoutItem *item = layout->itemAtPosition(row, column);
+            if (!item)
+                continue;
+            if (auto *button = qobject_cast<ColourButton *>(item->widget()))
+                palette.append(button->m_colour);
+        }
+    }
+
+    return palette;
+}
+
+
+void SettingsDialog::resetTagColourPalette()
+{
+    populateTagColourPalette(Settings::defaultTagColourPalette());
+}
+
+
 void SettingsDialog::restoreDefaults()
 {
     Settings defaultSettings;
@@ -284,6 +340,8 @@ void SettingsDialog::restoreDefaults()
     defaultSettings.autoNodeLengthPerMegabase = g_settings->autoNodeLengthPerMegabase;
 
     loadOrSaveSettingsToOrFromWidgets(true, &defaultSettings);
+
+    populateTagColourPalette(Settings::defaultTagColourPalette());
 
     const int defaultRecentLimitIndex = ui->recentFilesLimitComboBox->findData(recentfiles::DefaultLimit);
     if (defaultRecentLimitIndex >= 0)

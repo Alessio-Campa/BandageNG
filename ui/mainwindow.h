@@ -133,6 +133,9 @@ private slots:
     void saveSelectedPathToFile();
     void switchColourScheme(int idx = -1);
     void switchTagValue();
+    void openTagColoursDialog();
+    void openConditionalColoursDialog();
+    void updateColourSchemeControls();
     void determineContiguityFromSelectedNode();
     void saveImageCurrentView();
     void saveImageEntireScene();

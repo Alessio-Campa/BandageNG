@@ -119,6 +119,9 @@ Settings::Settings()
 
     defaultCustomNodeColour = QColor(190, 190, 190);
 
+    tagColourPalette = defaultTagColourPalette();
+    conditionalColour = QColor(220, 220, 220);
+
     minAutoFindEdgeOverlap = 10;
     maxAutoFindEdgeOverlap = 200;
 
@@ -147,6 +150,24 @@ Settings::Settings()
     maxDepthRange = FloatSetting(100.0, 0.0, 1000000.0);
 
     annotationsSettings = {};
+}
+
+
+QVector<QColor> Settings::defaultTagColourPalette()
+{
+    return {
+        QColor("#1f77b4"), QColor("#ff7f0e"), QColor("#2ca02c"), QColor("#d62728"),
+        QColor("#9467bd"), QColor("#8c564b"), QColor("#e377c2"), QColor("#7f7f7f"),
+        QColor("#bcbd22"), QColor("#17becf"), QColor("#aec7e8"), QColor("#ffbb78"),
+        QColor("#98df8a"), QColor("#ff9896"), QColor("#c5b0d5"), QColor("#c49c94"),
+        QColor("#f7b6d2"), QColor("#c7c7c7"), QColor("#dbdb8d"), QColor("#9edae5")
+    };
+}
+
+
+QString Settings::tagValueColourKey(const QString &tagName, const QString &value)
+{
+    return tagName + QChar(0x1f) + value;
 }
 
 

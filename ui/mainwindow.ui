@@ -1009,6 +1009,11 @@ When in double mode, you can include '+' or '-' at the end of the node name to s
                   <string>Colour by CSV column</string>
                  </property>
                 </item>
+                <item>
+                 <property name="text">
+                  <string>Conditional colours</string>
+                 </property>
+                </item>
                </widget>
               </item>
               <item row="0" column="2">
@@ -1191,6 +1196,26 @@ then colour which other nodes in the graph are likely to be contiguous
                <widget class="QComboBox" name="tagsComboBox">
                 <property name="focusPolicy">
                  <enum>Qt::StrongFocus</enum>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1" colspan="2">
+               <widget class="QPushButton" name="tagColoursButton">
+                <property name="visible">
+                 <bool>false</bool>
+                </property>
+                <property name="text">
+                 <string>Choose tag colours...</string>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="1" colspan="2">
+               <widget class="QPushButton" name="conditionalColoursButton">
+                <property name="visible">
+                 <bool>false</bool>
+                </property>
+                <property name="text">
+                 <string>Edit conditional rules...</string>
                 </property>
                </widget>
               </item>
@@ -3193,6 +3218,8 @@ then colour which other nodes in the graph are likely to be contiguous
   <tabstop>zoomSpinBox</tabstop>
   <tabstop>nodeWidthSpinBox</tabstop>
   <tabstop>coloursComboBox</tabstop>
+  <tabstop>tagColoursButton</tabstop>
+  <tabstop>conditionalColoursButton</tabstop>
   <tabstop>contiguityButton</tabstop>
   <tabstop>nodeCustomLabelsCheckBox</tabstop>
   <tabstop>nodeNamesCheckBox</tabstop>

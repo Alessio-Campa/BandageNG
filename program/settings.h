@@ -30,7 +30,9 @@
 
 #include <QColor>
 #include <QFont>
+#include <QHash>
 #include <QString>
+#include <QVector>
 #include <set>
 #include <unordered_map>
 
@@ -86,6 +88,20 @@ using AnnotationSettings = std::unordered_map<AnnotationGroupId, AnnotationSetti
 
 enum NodeLengthMode {AUTO_NODE_LENGTH, MANUAL_NODE_LENGTH};
 enum NodeDragging {ONE_PIECE, NEARBY_PIECES, ALL_PIECES, NO_DRAGGING};
+
+enum class TagMatchType {
+    Equals,
+    Contains,
+    StartsWith,
+    EndsWith
+};
+
+struct TagColourRule {
+    QString tagName;
+    TagMatchType matchType = TagMatchType::Equals;
+    QString value;
+    QColor colour;
+};
 
 class Settings
 {
@@ -196,6 +212,15 @@ public:
     QColor pathHighlightOutlineColour;
 
     QColor defaultCustomNodeColour;
+
+    //Colours used for GFA tag values and conditional tag rules.
+    QVector<QColor> tagColourPalette;
+    QHash<QString, QColor> tagValueColours;
+    QVector<TagColourRule> tagColourRules;
+    QColor conditionalColour;
+
+    static QVector<QColor> defaultTagColourPalette();
+    static QString tagValueColourKey(const QString &tagName, const QString &value);
 
     //These specify the range of overlaps to look for when Bandage determines
     //edge overlaps automatically.

@@ -21,6 +21,7 @@
 #include "contiguity.h"
 
 #include <tsl/htrie_map.h>
+#include <algorithm>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
@@ -108,16 +109,33 @@ public:
     [[nodiscard]] const char* name() const override { return "Color by tag value"; };
 
     void setTagName(const std::string &tagName) { m_tagName = tagName; }
+    [[nodiscard]] const std::string &tagName() const { return m_tagName; }
     [[nodiscard]] auto tagNames() const {
         std::vector<std::string> names(m_tagNames.begin(), m_tagNames.end());
         std::sort(names.begin(), names.end());
         return names;
     }
 
+    static constexpr int MaxCustomisableValues = 8;
+
+    [[nodiscard]] std::vector<std::string> valuesForTag(const std::string &tagName) const;
+    [[nodiscard]] QColor automaticColour(const std::string &tagName, const std::string &value) const;
+    [[nodiscard]] QColor effectiveColour(const std::string &tagName, const std::string &value) const;
+    [[nodiscard]] bool canCustomiseColours() const;
+
 private:
     std::string m_tagName = "";
     tsl::htrie_map<char, QColor> m_allTags;
     std::unordered_set<std::string> m_tagNames;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_tagValues;
+};
+
+class ConditionalNodeColorer : public INodeColorer {
+public:
+    using INodeColorer::INodeColorer;
+
+    QColor get(const GraphicsItemNode *node) override;
+    [[nodiscard]] const char* name() const override { return "Conditional colors"; };
 };
 
 class CSVNodeColorer : public INodeColorer {
