@@ -67,6 +67,10 @@
 #include <QColorDialog>
 #include <QFile>
 #include <QScrollBar>
+#include <QScrollArea>
+#include <QAbstractSlider>
+#include <QAbstractSpinBox>
+#include <QComboBox>
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QShortcut>
@@ -93,6 +97,56 @@
 #include <filesystem>
 
 namespace {
+//Scrolling over a spin box, combo box or slider should scroll the page, not
+//change the widget's value. Wheel events are forwarded to the enclosing
+//scroll area when there is one.
+class WheelValueGuard : public QObject
+{
+public:
+    using QObject::QObject;
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (event->type() != QEvent::Wheel)
+            return QObject::eventFilter(watched, event);
+
+        auto *widget = qobject_cast<QWidget *>(watched);
+        if (!widget)
+            return false;
+
+        //Scrollbars must keep their normal behaviour; forwarding their wheel
+        //events to the parent scroll area would recurse indefinitely.
+        if (qobject_cast<QScrollBar *>(widget))
+            return false;
+
+        const bool changesValue = qobject_cast<QAbstractSpinBox *>(widget) ||
+                                  qobject_cast<QComboBox *>(widget) ||
+                                  qobject_cast<QAbstractSlider *>(widget);
+        if (!changesValue)
+            return false;
+
+        QWidget *parent = widget->parentWidget();
+        while (parent && !qobject_cast<QScrollArea *>(parent))
+            parent = parent->parentWidget();
+
+        if (auto *scrollArea = qobject_cast<QScrollArea *>(parent)) {
+            //Protect against re-entering while the forwarded event is handled.
+            if (m_forwarding)
+                return true;
+
+            m_forwarding = true;
+            QApplication::sendEvent(scrollArea->viewport(), event);
+            m_forwarding = false;
+        }
+
+        return true;
+    }
+
+private:
+    bool m_forwarding = false;
+};
+
 class CommaSeparatedCompleter : public QCompleter {
 public:
     using QCompleter::QCompleter;
@@ -194,6 +248,10 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     Q_UNUSED(drawGraphAfterLoad)
 
     ui->setupUi(this);
+
+    //Wheel scrolling over value widgets should scroll the page instead of
+    //changing their values, everywhere in the application.
+    qApp->installEventFilter(new WheelValueGuard(qApp));
 
     connect(ui->menuRecentFiles, &QMenu::aboutToShow, this, &MainWindow::updateRecentFilesMenu);
     updateRecentFilesMenu();
