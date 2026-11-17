@@ -97,6 +97,9 @@ private:
     void setupWalkSelectionLineEdit(QLineEdit *lineEdit);
     bool checkForImageSave();
 
+    void addRecentFile(const QString &fullFileName);
+    void updateRecentFilesMenu();
+
     void setSelectedNodesWidgetsVisibility(bool visible);
     void setSelectedEdgesWidgetsVisibility(bool visible);
     void setStartingNodesWidgetVisibility(bool visible);
@@ -116,6 +119,7 @@ private slots:
     void loadGraphLayout(QString fullFileName = "");
     void loadGraphPaths(QString fullFileName = "");
     void loadGraphLinks(QString fullFileName = "");
+    void clearRecentFiles();
     void selectionChanged();
     void graphScopeChanged();
     void drawGraph();

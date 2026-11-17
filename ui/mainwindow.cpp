@@ -52,10 +52,13 @@
 #include "program/globals.h"
 #include "program/memory.h"
 #include "program/settings.h"
+#include "program/recentfiles.h"
 
 #include <QFileDialog>
+#include <QDir>
 #include <QLatin1String>
 #include <QTextStream>
+#include <QTextOption>
 #include <QClipboard>
 #include <QTransform>
 #include <QFontDialog>
@@ -104,6 +107,34 @@ public:
         return text.left(comma + 1) + " " + completion;
     }
 };
+
+//QLabel only breaks lines at word boundaries, so long tag values without any
+//whitespace would otherwise stay on a single (clipped) line. Inserting
+//zero-width spaces gives the label places where it can wrap.
+QString addLineBreakOpportunities(const QString &text, int maxRunLength = 16)
+{
+    QString result;
+    result.reserve(text.size() + text.size() / maxRunLength + 16);
+
+    int runLength = 0;
+    for (const QChar ch : text) {
+        result += ch;
+        if (ch.isSpace()) {
+            runLength = 0;
+        } else if (ch == u':' || ch == u',' || ch == u';' || ch == u'+' ||
+                   ch == u'=' || ch == u'|' || ch == u'/') {
+            //Separators are natural break points (e.g. the commas in long
+            //comma-separated tag values).
+            result += QChar(0x200b); // zero-width space
+            runLength = 0;
+        } else if (++runLength >= maxRunLength) {
+            result += QChar(0x200b); // zero-width space
+            runLength = 0;
+        }
+    }
+
+    return result;
+}
 }
 
 MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
@@ -114,8 +145,17 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
 {
     ui->setupUi(this);
 
+    connect(ui->menuRecentFiles, &QMenu::aboutToShow, this, &MainWindow::updateRecentFilesMenu);
+    updateRecentFilesMenu();
+
     QApplication::setWindowIcon(QIcon(QPixmap(":/icons/icon.png")));
     ui->graphicsViewWidget->layout()->addWidget(g_graphicsView);
+
+    //The side panels can be resized by dragging the splitter handles. Extra
+    //space (e.g. when resizing the window) should go to the graph view only.
+    ui->mainSplitter->setStretchFactor(0, 0);
+    ui->mainSplitter->setStretchFactor(1, 1);
+    ui->mainSplitter->setStretchFactor(2, 0);
 
     srand(time(nullptr));
 
@@ -127,6 +167,17 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     //so fix them at a smaller height.
     ui->selectedNodesTextEdit->setFixedHeight(ui->selectedNodesTextEdit->sizeHint().height() / 2.5);
     ui->selectedEdgesTextEdit->setFixedHeight(ui->selectedEdgesTextEdit->sizeHint().height() / 2.5);
+
+    //Long node/edge lists must wrap instead of making the selection panel (and
+    //therefore the whole window) wider. WrapAnywhere also handles long names
+    //that contain no spaces.
+    const auto configureWrappingTextEdit = [](QPlainTextEdit *textEdit) {
+        textEdit->setLineWrapMode(QPlainTextEdit::WidgetWidth);
+        textEdit->setWordWrapMode(QTextOption::WrapAnywhere);
+        textEdit->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    };
+    configureWrappingTextEdit(ui->selectedNodesTextEdit);
+    configureWrappingTextEdit(ui->selectedEdgesTextEdit);
 
     setUiState(NO_GRAPH_LOADED);
 
@@ -417,6 +468,7 @@ void MainWindow::loadGraph(QString fullFileName) {
                 g_assemblyGraph->determineGraphInfo();
                 displayGraphDetails();
                 g_memory->rememberedPath = QFileInfo(fullFileName).absolutePath();
+                addRecentFile(fullFileName);
                 g_memory->clearGraphSpecificMemory();
 
                 bool customColours = builder->hasCustomColours(),
@@ -442,6 +494,47 @@ void MainWindow::loadGraph(QString fullFileName) {
     auto res = QtConcurrent::run(&io::AssemblyGraphBuilder::build, builder, std::ref(*g_assemblyGraph));
     watcher->setFuture(res);
 }
+
+
+void MainWindow::addRecentFile(const QString &fullFileName)
+{
+    recentfiles::addPath(fullFileName);
+    updateRecentFilesMenu();
+}
+
+
+void MainWindow::updateRecentFilesMenu()
+{
+    ui->menuRecentFiles->clear();
+
+    const QStringList files = recentfiles::existingPaths();
+    if (files.isEmpty()) {
+        QAction *noRecentFilesAction = ui->menuRecentFiles->addAction(tr("No recent files"));
+        noRecentFilesAction->setEnabled(false);
+        return;
+    }
+
+    for (const QString &file : files) {
+        QString label = QDir::toNativeSeparators(file);
+        label.replace(QLatin1Char('&'), QLatin1String("&&"));
+
+        QAction *action = ui->menuRecentFiles->addAction(label);
+        action->setData(file);
+        connect(action, &QAction::triggered, this, [this, file]() { loadGraph(file); });
+    }
+
+    ui->menuRecentFiles->addSeparator();
+    QAction *clearAction = ui->menuRecentFiles->addAction(tr("Clear Recent Files"));
+    connect(clearAction, &QAction::triggered, this, &MainWindow::clearRecentFiles);
+}
+
+
+void MainWindow::clearRecentFiles()
+{
+    recentfiles::clear();
+    updateRecentFilesMenu();
+}
+
 
 void MainWindow::loadGraphLayout(QString fullFileName) {
     if (fullFileName.isEmpty())
@@ -616,9 +709,12 @@ void MainWindow::selectionChanged()
             ui->selectedNodesDepthLabel->setText("Depth: " + selectedNodeDepthText);
             if (selectedNodeTagText.length()) {
                 ui->selectedNodesTagLabel->setVisible(true);
-                ui->selectedNodesTagLabel->setText("Tags: " + selectedNodeTagText);
-            } else
+                ui->selectedNodesTagLabel->setText("Tags: " + addLineBreakOpportunities(selectedNodeTagText));
+                ui->selectedNodesTagLabel->setToolTip(selectedNodeTagText.toHtmlEscaped());
+            } else {
                 ui->selectedNodesTagLabel->setVisible(false);
+                ui->selectedNodesTagLabel->setToolTip(QString());
+            }
         }
         else
         {
@@ -626,6 +722,7 @@ void MainWindow::selectionChanged()
             ui->selectedNodesLengthLabel->setText("Total length: " + selectedNodeLengthText);
             ui->selectedNodesDepthLabel->setText("Mean depth: " + selectedNodeDepthText);
             ui->selectedNodesTagLabel->setVisible(false);
+            ui->selectedNodesTagLabel->setToolTip(QString());
         }
 
         ui->selectedNodesTextEdit->setPlainText(selectedNodeListText);
@@ -1785,6 +1882,7 @@ void MainWindow::openSettingsDialog() {
         return;
 
     settingsDialog.setSettingsFromWidgets();
+    updateRecentFilesMenu();
 
     g_assemblyGraph->recalculateAllNodeWidths(ui->nodeWidthSpinBox->value(),
                                               g_settings->depthPower, g_settings->depthEffectOnWidth);

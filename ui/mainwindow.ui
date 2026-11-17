@@ -38,6 +38,16 @@
      <number>0</number>
     </property>
     <item>
+     <widget class="ResizeSplitter" name="mainSplitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="childrenCollapsible">
+       <bool>false</bool>
+      </property>
+      <property name="handleWidth">
+       <number>8</number>
+      </property>
      <widget class="VerticalScrollArea" name="controlsScrollArea">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
@@ -1736,14 +1746,18 @@ then colour which other nodes in the graph are likely to be contiguous
        </layout>
       </widget>
      </widget>
-    </item>
-    <item>
      <widget class="QWidget" name="graphicsViewWidget" native="true">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>250</width>
+        <height>0</height>
+       </size>
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout_9">
        <property name="spacing">
@@ -1766,8 +1780,6 @@ then colour which other nodes in the graph are likely to be contiguous
        </item>
       </layout>
      </widget>
-    </item>
-    <item>
      <widget class="VerticalScrollArea" name="selectionScrollArea">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
@@ -2412,13 +2424,19 @@ then colour which other nodes in the graph are likely to be contiguous
         <item>
          <widget class="QLabel" name="selectedNodesTagLabel">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+           <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
           <property name="text">
            <string>Tags:</string>
+          </property>
+          <property name="textFormat">
+           <enum>Qt::PlainText</enum>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
           </property>
           <property name="alignment">
            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -2583,6 +2601,7 @@ then colour which other nodes in the graph are likely to be contiguous
        </layout>
       </widget>
      </widget>
+     </widget>
     </item>
    </layout>
   </widget>
@@ -2599,7 +2618,13 @@ then colour which other nodes in the graph are likely to be contiguous
     <property name="title">
      <string>File</string>
     </property>
+    <widget class="QMenu" name="menuRecentFiles">
+     <property name="title">
+      <string>Open Recent</string>
+     </property>
+    </widget>
     <addaction name="actionLoad_graph"/>
+    <addaction name="menuRecentFiles"/>
     <addaction name="actionLoad_loganGraph"/>
     <addaction name="actionLoad_CSV"/>
     <addaction name="actionLoad_layout"/>
@@ -3126,6 +3151,12 @@ then colour which other nodes in the graph are likely to be contiguous
    <class>VerticalScrollArea</class>
    <extends>QScrollArea</extends>
    <header>widgets/verticalscrollarea.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ResizeSplitter</class>
+   <extends>QSplitter</extends>
+   <header>widgets/resizesplitter.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

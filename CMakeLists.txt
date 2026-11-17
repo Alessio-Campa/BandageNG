@@ -32,6 +32,7 @@ set(LIB_SOURCES
     program/scinot.cpp
     program/settings.cpp
     program/colormap.cpp
+    program/recentfiles.cpp
     ui/dialogs/aboutdialog.cpp
     ui/annotationswidget.cpp
     ui/bedwidget.cpp
@@ -56,6 +57,7 @@ set(LIB_SOURCES
     ui/dialogs/settingsdialog.cpp
     ui/widgets/verticallabel.cpp
     ui/widgets/verticalscrollarea.cpp
+    ui/widgets/resizesplitter.cpp
     ui/dialogs/logandownloaddialog.cpp
     graph/nodecolorer.cpp
     graph/sequenceutils.cpp

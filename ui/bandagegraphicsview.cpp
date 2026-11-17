@@ -22,6 +22,9 @@
 #include "program/settings.h"
 #include "graphicsviewzoom.h"
 #include <QMouseEvent>
+#include <QCoreApplication>
+#include <QScrollBar>
+#include <QWheelEvent>
 #include <QFont>
 #include <QMessageBox>
 #include <qmath.h>
@@ -112,6 +115,36 @@ double BandageGraphicsView::distance(double x1, double y1, double x2, double y2)
     double xDiff = x1 - x2;
     double yDiff = y1 - y2;
     return sqrt(xDiff * xDiff + yDiff * yDiff);
+}
+
+void BandageGraphicsView::wheelEvent(QWheelEvent * event)
+{
+    const QPoint angleDelta = event->angleDelta();
+    const QPoint pixelDelta = event->pixelDelta();
+
+    //QAbstractScrollArea forwards a wheel event to only one scrollbar (the one
+    //with the larger delta). For a trackpad that makes diagonal panning move
+    //in separate horizontal/vertical steps. Split events that move on both
+    //axes so the two scrollbars scroll together and give a smooth diagonal pan.
+    if (angleDelta.x() != 0 && angleDelta.y() != 0)
+    {
+        QWheelEvent horizontalEvent(event->position(), event->globalPosition(),
+                                    QPoint(pixelDelta.x(), 0), QPoint(angleDelta.x(), 0),
+                                    event->buttons(), event->modifiers(), event->phase(),
+                                    event->inverted(), event->source(), event->pointingDevice());
+        QCoreApplication::sendEvent(horizontalScrollBar(), &horizontalEvent);
+
+        QWheelEvent verticalEvent(event->position(), event->globalPosition(),
+                                  QPoint(0, pixelDelta.y()), QPoint(0, angleDelta.y()),
+                                  event->buttons(), event->modifiers(), event->phase(),
+                                  event->inverted(), event->source(), event->pointingDevice());
+        QCoreApplication::sendEvent(verticalScrollBar(), &verticalEvent);
+
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::wheelEvent(event);
 }
 
 void BandageGraphicsView::keyPressEvent(QKeyEvent * event)

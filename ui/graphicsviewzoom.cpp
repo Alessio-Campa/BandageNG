@@ -28,7 +28,10 @@ GraphicsViewZoom::GraphicsViewZoom(BandageGraphicsView * view) :
     QObject(view), m_view(view)
 {
     g_absoluteZoom = 1.0;
-    m_view->viewport()->installEventFilter(this);
+    //Native gestures are delivered to the widget under the cursor, which can
+    //be the view frame, a scrollbar or the scrollbar corner near the edges of
+    //the view. An application filter lets us still handle them there.
+    qApp->installEventFilter(this);
     m_view->setMouseTracking(true);
     m_modifiers = Qt::ControlModifier;
     m_zoomFactorBase = g_settings->zoomFactor;
@@ -45,7 +48,7 @@ void GraphicsViewZoom::gentleZoom(double factor, ZoomSource zoomSource)
     g_absoluteZoom *= factor;
     m_view->scale(factor, factor);
 
-    if (zoomSource == MOUSE_WHEEL)
+    if (zoomSource == MOUSE_WHEEL || zoomSource == GESTURE)
     {
         m_view->centerOn(targetScenePos);
 
@@ -72,7 +75,9 @@ void GraphicsViewZoom::setZoomFactorBase(double value)
 
 bool GraphicsViewZoom::eventFilter(QObject *object, QEvent *event)
 {
-    if (event->type() == QEvent::MouseMove)
+    const bool fromViewport = (object == m_view->viewport());
+
+    if (fromViewport && event->type() == QEvent::MouseMove)
     {
         auto * mouseEvent = dynamic_cast<QMouseEvent*>(event);
         QPointF delta = targetViewportPos - mouseEvent->pos();
@@ -82,7 +87,7 @@ bool GraphicsViewZoom::eventFilter(QObject *object, QEvent *event)
             targetScenePos = m_view->mapToScene(mouseEvent->pos());
         }
     }
-    else if (event->type() == QEvent::Wheel)
+    else if (fromViewport && event->type() == QEvent::Wheel)
     {
         auto * wheelEvent = dynamic_cast<QWheelEvent*>(event);
         if (QApplication::keyboardModifiers() == m_modifiers)
@@ -98,9 +103,22 @@ bool GraphicsViewZoom::eventFilter(QObject *object, QEvent *event)
     }
     else if (event->type() == QEvent::NativeGesture)
     {
+        //Only handle gestures that belong to the graph view (including its
+        //frame, scrollbars and scrollbar corner).
+        auto *receiver = qobject_cast<QWidget *>(object);
+        if (!receiver || (receiver != m_view && !m_view->isAncestorOf(receiver)))
+            return false;
+
         auto * gestureEvent = dynamic_cast<QNativeGestureEvent *>(event);
         if (gestureEvent->gestureType() == Qt::ZoomNativeGesture)
         {
+            //Native gesture events are forwarded to the receiving widget without
+            //their position being translated to viewport coordinates, so map the
+            //global position instead. This is the point the zoom should be
+            //anchored at (usually the cursor / the centre of the pinch).
+            targetViewportPos = m_view->viewport()->mapFromGlobal(gestureEvent->globalPosition().toPoint());
+            targetScenePos = m_view->mapToScene(targetViewportPos.toPoint());
+
             double factor = 1.0 + gestureEvent->value();
             gentleZoom(factor, GESTURE);
             return true;
@@ -112,6 +130,5 @@ bool GraphicsViewZoom::eventFilter(QObject *object, QEvent *event)
         }
     }
 
-    Q_UNUSED(object)
     return false;
 }

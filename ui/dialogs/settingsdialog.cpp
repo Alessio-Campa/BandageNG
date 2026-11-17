@@ -21,6 +21,7 @@
 #include "ui/widgets/colourbutton.h"
 #include "program/scinot.h"
 #include "program/settings.h"
+#include "program/recentfiles.h"
 
 #include "graph/assemblygraph.h"
 #include "graph/nodecolorer.h"
@@ -56,6 +57,9 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
     ui->maybeContiguousColourButton->m_name = "Maybe contiguous colour";
     ui->notContiguousColourButton->m_name = "Not contiguous colour";
     ui->contiguityStartingColourButton->m_name = "Contiguity starting colour";
+
+    ui->recentFilesLimitComboBox->addItem("5", recentfiles::DefaultLimit);
+    ui->recentFilesLimitComboBox->addItem("10", recentfiles::MaximumLimit);
 
     connect(ui->restoreDefaultsButton, SIGNAL(clicked()), this, SLOT(restoreDefaults()));
     connect(ui->depthValueManualRadioButton, SIGNAL(toggled(bool)), this, SLOT(enableDisableDepthWidgets()));
@@ -128,6 +132,10 @@ void SettingsDialog::setWidgetsFromSettings()
 {
     loadOrSaveSettingsToOrFromWidgets(true, g_settings.data());
 
+    const int recentLimitIndex = ui->recentFilesLimitComboBox->findData(recentfiles::limit());
+    if (recentLimitIndex >= 0)
+        ui->recentFilesLimitComboBox->setCurrentIndex(recentLimitIndex);
+
     enableDisableDepthWidgets();
     checkBoxesChanged();
     lengthDiscrepancySpinBoxChanged();
@@ -137,6 +145,8 @@ void SettingsDialog::setWidgetsFromSettings()
 void SettingsDialog::setSettingsFromWidgets()
 {
     loadOrSaveSettingsToOrFromWidgets(false, g_settings.data());
+
+    recentfiles::setLimit(ui->recentFilesLimitComboBox->currentData().toInt());
 
     //The highlighted outline thickness should always be a bit
     //bigger than the outlineThickness.
@@ -274,6 +284,10 @@ void SettingsDialog::restoreDefaults()
     defaultSettings.autoNodeLengthPerMegabase = g_settings->autoNodeLengthPerMegabase;
 
     loadOrSaveSettingsToOrFromWidgets(true, &defaultSettings);
+
+    const int defaultRecentLimitIndex = ui->recentFilesLimitComboBox->findData(recentfiles::DefaultLimit);
+    if (defaultRecentLimitIndex >= 0)
+        ui->recentFilesLimitComboBox->setCurrentIndex(defaultRecentLimitIndex);
 }
 
 
