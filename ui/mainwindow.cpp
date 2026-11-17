@@ -74,7 +74,11 @@
 #include <QDesktopServices>
 #include <QSvgGenerator>
 #include <QCompleter>
+#include <QIcon>
+#include <QPainter>
+#include <QPixmap>
 #include <QStringListModel>
+#include <QToolBar>
 #include <QtConcurrent>
 #include <QFutureWatcher>
 #include <QTimer>
@@ -138,6 +142,45 @@ QString addLineBreakOpportunities(const QString &text, int maxRunLength = 16)
 
     return result;
 }
+
+//A macOS/iPad-style sidebar glyph (rounded rectangle with a vertical divider).
+QIcon makeSidebarIcon()
+{
+    constexpr int logicalSize = 20;
+    QIcon icon;
+
+    for (int scale : {1, 2}) {
+        QPixmap pixmap(logicalSize * scale, logicalSize * scale);
+        pixmap.fill(Qt::transparent);
+        pixmap.setDevicePixelRatio(scale);
+
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+
+        QColor iconColour = QApplication::palette().color(QPalette::ButtonText);
+        if (!iconColour.isValid())
+            iconColour = Qt::black;
+
+        QPen pen(iconColour, 1.4);
+        pen.setJoinStyle(Qt::RoundJoin);
+        painter.setPen(pen);
+        painter.setBrush(Qt::NoBrush);
+
+        const QRectF rect(3.0, 4.0, logicalSize - 6.0, logicalSize - 8.0);
+        painter.drawRoundedRect(rect, 3.0, 3.0);
+
+        const double dividerX = rect.left() + rect.width() * 0.4;
+        painter.drawLine(QPointF(dividerX, rect.top()),
+                         QPointF(dividerX, rect.bottom()));
+        painter.end();
+
+        icon.addPixmap(pixmap);
+    }
+
+    //On macOS this lets the system tint the icon to match light/dark mode.
+    icon.setIsMask(true);
+    return icon;
+}
 }
 
 MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
@@ -191,6 +234,21 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     m_graphicsViewZoom = new GraphicsViewZoom(g_graphicsView);
     g_graphicsView->m_zoom = m_graphicsViewZoom;
     m_lastAbsoluteZoom = g_absoluteZoom;
+
+    //Always-visible sidebar-style button for collapsing/restoring the controls panel.
+    ui->actionControls_panel->setIcon(makeSidebarIcon());
+    ui->actionControls_panel->setToolTip(tr("Show or hide the controls panel"));
+    auto *panelToolBar = addToolBar(tr("Sidebar"));
+    panelToolBar->setObjectName("panelToolBar");
+    panelToolBar->setMovable(false);
+    panelToolBar->setFloatable(false);
+    panelToolBar->setIconSize(QSize(20, 20));
+    panelToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    panelToolBar->addAction(ui->actionControls_panel);
+#ifdef Q_OS_MAC
+    //Merge the toolbar into the title bar, like native Mac apps.
+    setUnifiedTitleAndToolBarOnMac(true);
+#endif
 
     m_scene = new BandageGraphicsScene(this);
     g_graphicsView->setScene(m_scene);
