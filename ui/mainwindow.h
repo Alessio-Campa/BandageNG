@@ -66,6 +66,7 @@ private:
 
     GraphicsViewZoom * m_graphicsViewZoom;
     double m_previousZoomSpinBoxValue;
+    double m_lastAbsoluteZoom;
     QString m_imageFilter;
     QString m_fileToLoadOnStartup;
     UiState m_uiState;
@@ -89,6 +90,8 @@ private:
     void setUiState(UiState uiState);
     void selectBasedOnContiguity(ContiguityStatus contiguityStatus);
     void setWidgetsFromSettings();
+    void saveSettingsFromWidgets();
+    void scaleNodeWidthsForZoom(double zoomFactor);
     QString getDefaultImageFileName();
     void setGraphScopeComboBox(GraphScope graphScope);
     void setupQueryComboBox();

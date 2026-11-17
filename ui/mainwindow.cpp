@@ -190,6 +190,7 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
 
     m_graphicsViewZoom = new GraphicsViewZoom(g_graphicsView);
     g_graphicsView->m_zoom = m_graphicsViewZoom;
+    m_lastAbsoluteZoom = g_absoluteZoom;
 
     m_scene = new BandageGraphicsScene(this);
     g_graphicsView->setScene(m_scene);
@@ -328,6 +329,11 @@ void MainWindow::afterMainWindowShow() {
 }
 
 MainWindow::~MainWindow() {
+    //Remember the user's options for the next session (before cleanUp() resets
+    //some graph-specific values).
+    saveSettingsFromWidgets();
+    g_settings->savePersisted();
+
     cleanUp();
     delete m_graphicsViewZoom;
     delete ui;
@@ -1309,10 +1315,14 @@ void MainWindow::zoomSpinBoxChanged()
 {
     double newValue = ui->zoomSpinBox->value();
     double zoomFactor = newValue / m_previousZoomSpinBoxValue;
+    const double oldZoom = m_lastAbsoluteZoom;
     setZoomSpinBoxStep();
 
     m_graphicsViewZoom->gentleZoom(zoomFactor, SPIN_BOX);
+    if (oldZoom > 0.0)
+        scaleNodeWidthsForZoom(g_absoluteZoom / oldZoom);
 
+    m_lastAbsoluteZoom = g_absoluteZoom;
     m_previousZoomSpinBoxValue = newValue;
 }
 
@@ -1329,6 +1339,12 @@ void MainWindow::setZoomSpinBoxStep()
 
 void MainWindow::zoomedWithMouseWheel()
 {
+    //Keep the on-screen node width roughly constant while zooming.
+    const double oldZoom = m_lastAbsoluteZoom;
+    if (oldZoom > 0.0)
+        scaleNodeWidthsForZoom(g_absoluteZoom / oldZoom);
+    m_lastAbsoluteZoom = g_absoluteZoom;
+
     ui->zoomSpinBox->blockSignals(true);
     double newSpinBoxValue = g_absoluteZoom * 100.0;
     ui->zoomSpinBox->setValue(newSpinBoxValue);
@@ -1347,6 +1363,7 @@ void MainWindow::zoomToFitScene()
 
 void MainWindow::zoomToFitRect(QRectF rect)
 {
+    const double oldZoom = m_lastAbsoluteZoom;
     double startingZoom = g_graphicsView->transform().m11();
     g_graphicsView->fitInView(rect, Qt::KeepAspectRatio);
     double endingZoom = g_graphicsView->transform().m11();
@@ -1374,6 +1391,10 @@ void MainWindow::zoomToFitRect(QRectF rect)
     ui->zoomSpinBox->setValue(newSpinBoxValue);
     m_previousZoomSpinBoxValue = newSpinBoxValue;
     ui->zoomSpinBox->blockSignals(false);
+
+    if (oldZoom > 0.0)
+        scaleNodeWidthsForZoom(g_absoluteZoom / oldZoom);
+    m_lastAbsoluteZoom = g_absoluteZoom;
 }
 
 
@@ -1956,6 +1977,11 @@ void MainWindow::openSettingsDialog() {
 
     settingsDialog.setSettingsFromWidgets();
     updateRecentFilesMenu();
+
+    //Persist the new options right away, so they are remembered even if the
+    //program does not exit normally later.
+    saveSettingsFromWidgets();
+    g_settings->savePersisted();
 
     g_assemblyGraph->recalculateAllNodeWidths(ui->nodeWidthSpinBox->value(),
                                               g_settings->depthPower, g_settings->depthEffectOnWidth);
@@ -2557,6 +2583,26 @@ void MainWindow::openBandageUrl() {
 
 
 
+void MainWindow::saveSettingsFromWidgets()
+{
+    //Most options update g_settings as soon as the widget changes, but a few
+    //only take effect when the graph is drawn. Sync those here so the state
+    //saved at exit matches what the user sees.
+    g_settings->doubleMode = ui->doubleNodesRadioButton->isChecked();
+    g_settings->startingNodes = ui->startingNodesLineEdit->text();
+    g_settings->startingNodesExactMatch = ui->startingNodesExactMatchRadioButton->isChecked();
+    g_settings->graphScope = GraphScope(ui->graphScopeComboBox->currentIndex());
+    g_settings->nodeDistance = ui->nodeDistanceSpinBox->value();
+    g_settings->minDepthRange = ui->minDepthSpinBox->value();
+    g_settings->maxDepthRange = ui->maxDepthSpinBox->value();
+
+    g_settings->displayNodeNames = ui->nodeNamesCheckBox->isChecked();
+    g_settings->displayNodeLengths = ui->nodeLengthsCheckBox->isChecked();
+    g_settings->displayNodeDepth = ui->nodeDepthCheckBox->isChecked();
+    g_settings->textOutline = ui->textOutlineCheckBox->isChecked();
+}
+
+
 void MainWindow::setWidgetsFromSettings()
 {
     ui->singleNodesRadioButton->setChecked(!g_settings->doubleMode);
@@ -2644,6 +2690,32 @@ void MainWindow::nodeWidthChanged()
 {
     g_assemblyGraph->recalculateAllNodeWidths(ui->nodeWidthSpinBox->value(),
                                               g_settings->depthPower, g_settings->depthEffectOnWidth);
+    g_graphicsView->viewport()->update();
+}
+
+
+void MainWindow::scaleNodeWidthsForZoom(double zoomFactor)
+{
+    if (zoomFactor <= 0.0 || qFuzzyCompare(zoomFactor, 1.0))
+        return;
+
+    //Node widths are stored in scene coordinates. Partially compensating for
+    //the zoom change means the on-screen thickness still grows a bit when
+    //zooming in, but much more slowly than the rest of the graph. A factor of
+    //1.0 would keep the width perfectly constant on screen; 0.0 would leave it
+    //untouched in scene coordinates.
+    constexpr double compensation = 0.5;
+    const double widthScale = std::pow(zoomFactor, -compensation);
+    for (auto *node : g_assemblyGraph->m_deBruijnGraphNodes) {
+        if (GraphicsItemNode *graphicsItemNode = node->getGraphicsItemNode())
+            graphicsItemNode->scaleWidth(widthScale);
+    }
+
+    //The node width spin box shows scene-space widths, so keep it in sync.
+    ui->nodeWidthSpinBox->blockSignals(true);
+    ui->nodeWidthSpinBox->setValue(ui->nodeWidthSpinBox->value() * widthScale);
+    ui->nodeWidthSpinBox->blockSignals(false);
+
     g_graphicsView->viewport()->update();
 }
 

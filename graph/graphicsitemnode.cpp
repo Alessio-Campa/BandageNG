@@ -102,6 +102,18 @@ void GraphicsItemNode::setWidth(double depthRelativeToMeanDrawnDepth, double ave
         m_width = 0.0;
 }
 
+void GraphicsItemNode::scaleWidth(double factor)
+{
+    if (factor == 1.0)
+        return;
+
+    prepareGeometryChange();
+    m_width *= float(factor);
+    if (m_width < 0.0f)
+        m_width = 0.0f;
+    update();
+}
+
 static double distance(QPointF p1, QPointF p2) {
     auto xDiff = p1.x() - p2.x();
     auto yDiff = p1.y() - p2.y();

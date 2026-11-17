@@ -59,7 +59,22 @@ using SubCmd = std::variant<std::monostate,
                             QueryPathsCmd,
                             LayoutCmd>;
 
-static SubCmd parseCmdLine(CLI::App &app, int argc, char *argv[]) {
+//Only the GUI should restore the options saved from a previous GUI session.
+//Command line subcommands keep their deterministic defaults.
+static bool isGuiLaunch(int argc, char *argv[])
+{
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg(argv[i]);
+        if (arg == "image" || arg == "info" || arg == "reduce" ||
+            arg == "querypaths" || arg == "layout")
+            return false;
+    }
+
+    return true;
+}
+
+static SubCmd parseCmdLine(CLI::App &app, int argc, char *argv[],
+                           bool restorePersistedOptions) {
     SubCmd subcmd;
 
     app.description(getBandageTitleAsciiArt() + '\n' +
@@ -70,6 +85,12 @@ static SubCmd parseCmdLine(CLI::App &app, int argc, char *argv[]) {
     app.fallthrough();
 
     addSettings(app);
+
+    //Restore the GUI options after the command line options have been
+    //registered (which resets some values to their command line defaults) but
+    //before parsing, so explicitly provided command line options still win.
+    if (restorePersistedOptions)
+        g_settings->loadPersisted();
 
     // "BandageNG load"
     LoadCmd loadCmd;
@@ -149,7 +170,7 @@ int main(int argc, char *argv[]) {
     g_settings.reset(new Settings());
 
     try {
-        cmd = parseCmdLine(cli, argc, argv);
+        cmd = parseCmdLine(cli, argc, argv, isGuiLaunch(argc, argv));
     } catch (const CLI::ParseError &e) {
         return cli.exit(e);
     }

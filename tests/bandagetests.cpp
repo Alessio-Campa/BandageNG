@@ -45,6 +45,7 @@
 #include <QtTest/QtTest>
 #include <QDebug>
 #include <QTemporaryDir>
+#include <QSettings>
 
 #include <algorithm>
 #include <iostream>
@@ -127,6 +128,7 @@ private slots:
     void graphScope();
     void graphScopeComponent();
     void graphLayout();
+    void settingsPersistence();
     void commandLineSettings();
     void sciNotComparisons();
     void graphEdits();
@@ -1045,6 +1047,52 @@ void BandageTests::graphLayout() {
 
         QCOMPARE(layout.size(), 88);
     }
+}
+
+void BandageTests::settingsPersistence() {
+    //Keep the round-trip out of the user's real configuration.
+    const QSettings::Format previousFormat = QSettings::defaultFormat();
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_tmpDir.path());
+
+    Settings saved;
+    saved.doubleMode = true;
+    saved.edgeLength = 12.5;
+    saved.graphLayoutQuality = 4;
+    saved.edgeColour = QColor(12, 34, 56);
+    saved.graphScope = AROUND_NODE;
+    saved.nodeDistance = 7;
+    saved.startingNodes = "1+,2-";
+    saved.maxEValueProduct = SciNot(3.3, -7);
+    saved.tagColourRules = {TagColourRule{"tag", TagMatchType::Contains, "value", QColor(1, 2, 3)}};
+    saved.tagValueColours.insert(Settings::tagValueColourKey("tag", "value"), QColor(4, 5, 6));
+    saved.tagColourPalette = {QColor(7, 8, 9), QColor(10, 11, 12)};
+    saved.savePersisted();
+
+    Settings loaded;
+    loaded.loadPersisted();
+
+    QCOMPARE(loaded.doubleMode, saved.doubleMode);
+    QCOMPARE(loaded.edgeLength.val, saved.edgeLength.val);
+    QCOMPARE(loaded.graphLayoutQuality.val, saved.graphLayoutQuality.val);
+    QCOMPARE(loaded.edgeColour, saved.edgeColour);
+    QCOMPARE(loaded.graphScope, saved.graphScope);
+    QCOMPARE(loaded.nodeDistance.val, saved.nodeDistance.val);
+    QCOMPARE(loaded.startingNodes, saved.startingNodes);
+    QCOMPARE(loaded.maxEValueProduct.val.getCoefficient(),
+             saved.maxEValueProduct.val.getCoefficient());
+    QCOMPARE(loaded.maxEValueProduct.val.getExponent(),
+             saved.maxEValueProduct.val.getExponent());
+    QCOMPARE(loaded.tagColourRules.size(), saved.tagColourRules.size());
+    QCOMPARE(int(loaded.tagColourRules.front().matchType),
+             int(saved.tagColourRules.front().matchType));
+    QCOMPARE(loaded.tagColourRules.front().colour, saved.tagColourRules.front().colour);
+    QCOMPARE(loaded.tagValueColours.size(), 1);
+    QCOMPARE(loaded.tagValueColours.value(Settings::tagValueColourKey("tag", "value")),
+             QColor(4, 5, 6));
+    QCOMPARE(loaded.tagColourPalette, saved.tagColourPalette);
+
+    QSettings::setDefaultFormat(previousFormat);
 }
 
 static void parseSettings(const QStringList &commandLineSettings) {

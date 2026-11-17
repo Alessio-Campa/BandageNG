@@ -91,6 +91,7 @@ public:
     void setWidth(double depthRelativeToMeanDrawnDepth,
                   double averageNodeWidth = 5.0,
                   double depthPower = 0.5, double depthEffectOnWidth = 0.5);
+    void scaleWidth(double factor);
     QPainterPath makePartialPath(double startFraction, double endFraction);
     double getNodePathLength();
     QPointF findLocationOnPath(double fraction);

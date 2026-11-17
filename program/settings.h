@@ -109,6 +109,10 @@ class Settings
 public:
     Settings();
 
+    //Persist user-facing options between program runs (GUI only).
+    void loadPersisted();
+    void savePersisted() const;
+
     bool doubleMode;
 
     NodeLengthMode nodeLengthMode;
