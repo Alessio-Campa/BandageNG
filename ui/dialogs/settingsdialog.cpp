@@ -37,6 +37,10 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    //The native tab pane draws a horizontal line under the tab bar. The tab
+    //pages have their own scroll areas, so the pane border is unnecessary.
+    ui->settingsTabWidget->setStyleSheet("QTabWidget::pane { border: none; }");
+
     //On a PC and Linux, this window is called 'Settings', but on the Mac it is
     //called 'Preferences'.
     QString windowTitle = "Settings";

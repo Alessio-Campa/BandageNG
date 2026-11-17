@@ -35,6 +35,8 @@
 #include "command_line/commoncommandlinefunctions.h"
 #include "command_line/settings.h"
 
+#include "ui/dialogs/settingsdialog.h"
+
 #include "graphsearch/graphsearch.h"
 #include "graphsearch/query.h"
 #include "graphsearch/hit.h"
@@ -129,6 +131,7 @@ private slots:
     void graphScopeComponent();
     void graphLayout();
     void settingsPersistence();
+    void settingsDialog();
     void commandLineSettings();
     void sciNotComparisons();
     void graphEdits();
@@ -1093,6 +1096,12 @@ void BandageTests::settingsPersistence() {
     QCOMPARE(loaded.tagColourPalette, saved.tagColourPalette);
 
     QSettings::setDefaultFormat(previousFormat);
+}
+
+void BandageTests::settingsDialog() {
+    SettingsDialog dialog;
+    dialog.setWidgetsFromSettings();
+    dialog.setSettingsFromWidgets();
 }
 
 static void parseSettings(const QStringList &commandLineSettings) {
