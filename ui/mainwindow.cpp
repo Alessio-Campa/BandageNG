@@ -1289,7 +1289,12 @@ void MainWindow::drawGraph() {
 void MainWindow::graphLayoutFinished(const GraphLayout &layout) {
     m_scene->addGraphicsItemsToScene(*g_assemblyGraph, layout);
     m_scene->setSceneRectangle();
-    zoomToFitScene();
+
+    //Fit the graph as before, but treat that initial view as 100% zoom.
+    zoomToFitRect(m_scene->sceneRect(), true);
+    g_zoomReference = g_absoluteZoom > 0.0 ? g_absoluteZoom : 1.0;
+    updateZoomSpinBox();
+    m_lastAbsoluteZoom = g_absoluteZoom;
 
     double averageNodeWidth = g_settings->averageNodeWidth / pow(g_absoluteZoom, 0.75);
     ui->nodeWidthSpinBox->setValue(averageNodeWidth);
@@ -1372,17 +1377,24 @@ void MainWindow::layoutGraph()
 
 void MainWindow::zoomSpinBoxChanged()
 {
+    const double reference = g_zoomReference > 0.0 ? g_zoomReference : 1.0;
     double newValue = ui->zoomSpinBox->value();
-    double zoomFactor = newValue / m_previousZoomSpinBoxValue;
+    double zoomFactor = m_previousZoomSpinBoxValue > 0.0
+            ? newValue / m_previousZoomSpinBoxValue
+            : 1.0;
     const double oldZoom = m_lastAbsoluteZoom;
-    setZoomSpinBoxStep();
 
     m_graphicsViewZoom->gentleZoom(zoomFactor, SPIN_BOX);
     if (oldZoom > 0.0)
         scaleNodeWidthsForZoom(g_absoluteZoom / oldZoom);
-
     m_lastAbsoluteZoom = g_absoluteZoom;
-    m_previousZoomSpinBoxValue = newValue;
+
+    //The zoom may have been clamped, so show the actual value.
+    ui->zoomSpinBox->blockSignals(true);
+    ui->zoomSpinBox->setValue(g_absoluteZoom / reference * 100.0);
+    setZoomSpinBoxStep();
+    m_previousZoomSpinBoxValue = ui->zoomSpinBox->value();
+    ui->zoomSpinBox->blockSignals(false);
 }
 
 void MainWindow::setZoomSpinBoxStep()
@@ -1398,6 +1410,8 @@ void MainWindow::setZoomSpinBoxStep()
 
 void MainWindow::zoomedWithMouseWheel()
 {
+    const double reference = g_zoomReference > 0.0 ? g_zoomReference : 1.0;
+
     //Keep the on-screen node width roughly constant while zooming.
     const double oldZoom = m_lastAbsoluteZoom;
     if (oldZoom > 0.0)
@@ -1405,7 +1419,7 @@ void MainWindow::zoomedWithMouseWheel()
     m_lastAbsoluteZoom = g_absoluteZoom;
 
     ui->zoomSpinBox->blockSignals(true);
-    double newSpinBoxValue = g_absoluteZoom * 100.0;
+    double newSpinBoxValue = g_absoluteZoom / reference * 100.0;
     ui->zoomSpinBox->setValue(newSpinBoxValue);
     setZoomSpinBoxStep();
     m_previousZoomSpinBoxValue = newSpinBoxValue;
@@ -1420,17 +1434,19 @@ void MainWindow::zoomToFitScene()
 }
 
 
-void MainWindow::zoomToFitRect(QRectF rect)
+void MainWindow::zoomToFitRect(QRectF rect, bool ignoreMinimumZoom)
 {
+    const double reference = g_zoomReference > 0.0 ? g_zoomReference : 1.0;
     const double oldZoom = m_lastAbsoluteZoom;
     double startingZoom = g_graphicsView->transform().m11();
     g_graphicsView->fitInView(rect, Qt::KeepAspectRatio);
     double endingZoom = g_graphicsView->transform().m11();
-    double zoomFactor = endingZoom / startingZoom;
+    double zoomFactor = startingZoom != 0.0 ? endingZoom / startingZoom : 1.0;
     g_absoluteZoom *= zoomFactor;
-    double newSpinBoxValue = ui->zoomSpinBox->value() * zoomFactor;
+    double newSpinBoxValue = g_absoluteZoom / reference * 100.0;
 
-    double minZoom = std::max(g_settings->minZoom, g_settings->minZoomOnGraphDraw);
+    const double minZoom = ignoreMinimumZoom ? 0.0 :
+            reference * std::max(g_settings->minZoom, g_settings->minZoomOnGraphDraw);
 
     //Limit the zoom to the minimum and maximum
     if (g_absoluteZoom < minZoom)
@@ -1438,22 +1454,41 @@ void MainWindow::zoomToFitRect(QRectF rect)
         double newZoomFactor = minZoom / g_absoluteZoom;
         m_graphicsViewZoom->gentleZoom(newZoomFactor, SPIN_BOX);
         g_absoluteZoom = minZoom;
-        newSpinBoxValue = g_absoluteZoom * 100.0;
+        newSpinBoxValue = g_absoluteZoom / reference * 100.0;
     } else if (g_absoluteZoom > g_settings->maxAutomaticZoom) {
         double newZoomFactor = g_settings->maxAutomaticZoom / g_absoluteZoom;
         m_graphicsViewZoom->gentleZoom(newZoomFactor, SPIN_BOX);
         g_absoluteZoom = g_settings->maxAutomaticZoom;
-        newSpinBoxValue = g_absoluteZoom * 100.0;
+        newSpinBoxValue = g_absoluteZoom / reference * 100.0;
     }
 
     ui->zoomSpinBox->blockSignals(true);
     ui->zoomSpinBox->setValue(newSpinBoxValue);
-    m_previousZoomSpinBoxValue = newSpinBoxValue;
+    setZoomSpinBoxStep();
+    m_previousZoomSpinBoxValue = ui->zoomSpinBox->value();
     ui->zoomSpinBox->blockSignals(false);
 
     if (oldZoom > 0.0)
         scaleNodeWidthsForZoom(g_absoluteZoom / oldZoom);
     m_lastAbsoluteZoom = g_absoluteZoom;
+}
+
+
+void MainWindow::updateZoomSpinBox()
+{
+    const double reference = g_zoomReference > 0.0 ? g_zoomReference : 1.0;
+    const double minDisplay = g_settings->minZoom * 100.0;
+    double maxDisplay = g_settings->maxZoom / reference * 100.0;
+    if (maxDisplay < minDisplay)
+        maxDisplay = minDisplay;
+
+    ui->zoomSpinBox->blockSignals(true);
+    ui->zoomSpinBox->setMinimum(minDisplay);
+    ui->zoomSpinBox->setMaximum(maxDisplay);
+    ui->zoomSpinBox->setValue(g_absoluteZoom / reference * 100.0);
+    setZoomSpinBoxStep();
+    m_previousZoomSpinBoxValue = ui->zoomSpinBox->value();
+    ui->zoomSpinBox->blockSignals(false);
 }
 
 

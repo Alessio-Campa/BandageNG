@@ -80,8 +80,9 @@ private:
     void resetScene();
     void resetAllNodeColours();
     void layoutGraph();
-    void zoomToFitRect(QRectF rect);
+    void zoomToFitRect(QRectF rect, bool ignoreMinimumZoom = false);
     void setZoomSpinBoxStep();
+    void updateZoomSpinBox();
     void getSelectedNodeInfo(int & selectedNodeCount, QString & selectedNodeCountText,
                              QString & selectedNodeListText, QString & selectedNodeLengthText, QString &selectedNodeDepthText,
                              QString &selectNodeTagText);

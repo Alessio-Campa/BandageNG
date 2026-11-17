@@ -64,8 +64,9 @@ Settings::Settings()
     queryFilename = "";
     unnamedQueryDefaultName = "unnamed";
 
-    minZoom = 0.001;
-    minZoomOnGraphDraw = 0.001;
+    //Zoom limits are relative to the initial fit-to-graph view (100%).
+    minZoom = 0.5;
+    minZoomOnGraphDraw = 0.5;
     maxZoom = 100.0;
     maxAutomaticZoom = 10.0;
     zoomFactor = 1.0005;

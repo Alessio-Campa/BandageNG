@@ -28,6 +28,7 @@ GraphicsViewZoom::GraphicsViewZoom(BandageGraphicsView * view) :
     QObject(view), m_view(view)
 {
     g_absoluteZoom = 1.0;
+    g_zoomReference = 1.0;
     //Native gestures are delivered to the widget under the cursor, which can
     //be the view frame, a scrollbar or the scrollbar corner near the edges of
     //the view. An application filter lets us still handle them there.
@@ -39,11 +40,15 @@ GraphicsViewZoom::GraphicsViewZoom(BandageGraphicsView * view) :
 
 void GraphicsViewZoom::gentleZoom(double factor, ZoomSource zoomSource)
 {
+    const double reference = g_zoomReference > 0.0 ? g_zoomReference : 1.0;
+    double minAbsoluteZoom = reference * g_settings->minZoom;
+    if (minAbsoluteZoom > g_settings->maxZoom)
+        minAbsoluteZoom = g_settings->maxZoom;
 
     if (g_absoluteZoom * factor >= g_settings->maxZoom)
         factor = g_settings->maxZoom / g_absoluteZoom;
-    if (g_absoluteZoom * factor <= g_settings->minZoom)
-        factor = g_settings->minZoom / g_absoluteZoom;
+    if (g_absoluteZoom * factor <= minAbsoluteZoom)
+        factor = minAbsoluteZoom / g_absoluteZoom;
 
     g_absoluteZoom *= factor;
     m_view->scale(factor, factor);
