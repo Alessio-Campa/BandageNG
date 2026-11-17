@@ -68,7 +68,6 @@ private:
     double m_previousZoomSpinBoxValue;
     QString m_imageFilter;
     QString m_fileToLoadOnStartup;
-    bool m_drawGraphAfterLoad;
     UiState m_uiState;
     GraphSearchDialog * m_graphSearchDialog;
 

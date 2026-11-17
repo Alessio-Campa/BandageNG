@@ -75,6 +75,7 @@
 #include <QStringListModel>
 #include <QtConcurrent>
 #include <QFutureWatcher>
+#include <QTimer>
 
 #include <iterator>
 #include <algorithm>
@@ -140,9 +141,13 @@ QString addLineBreakOpportunities(const QString &text, int maxRunLength = 16)
 MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     QMainWindow(nullptr),
     ui(new Ui::MainWindow), m_imageFilter("PNG (*.png)"),
-    m_fileToLoadOnStartup(fileToLoadOnStartup), m_drawGraphAfterLoad(drawGraphAfterLoad),
+    m_fileToLoadOnStartup(fileToLoadOnStartup),
     m_uiState(NO_GRAPH_LOADED), m_graphSearchDialog(nullptr), m_alreadyShown(false)
 {
+    //Graphs are always drawn automatically after loading, so this argument is
+    //only kept for compatibility with existing command line usage.
+    Q_UNUSED(drawGraphAfterLoad)
+
     ui->setupUi(this);
 
     connect(ui->menuRecentFiles, &QMenu::aboutToShow, this, &MainWindow::updateRecentFilesMenu);
@@ -310,12 +315,6 @@ void MainWindow::afterMainWindowShow() {
         GraphSearchDialog graphSearchDialog(this, g_settings->queryFilename);
         setupQueryComboBox();
     }
-
-    // If the draw option was used and the graph appears to have loaded (i.e. there
-    // is at least one node), then draw the graph.
-    // FIXME: This does not work as graph loading is asynchronous now. We need to wait until it is loaded
-    if (!m_fileToLoadOnStartup.isEmpty() && m_drawGraphAfterLoad && !g_assemblyGraph->m_deBruijnGraphNodes.empty())
-        drawGraph();
 
     // If a csv query filename is present, pull the info automatically.
     if (!g_settings->csvFilename.isEmpty())
@@ -487,6 +486,10 @@ void MainWindow::loadGraph(QString fullFileName) {
                 setupPathSelectionLineEdit(ui->pathSelectionLineEdit2);
                 setupWalkSelectionLineEdit(ui->walkSelectionLineEdit);
                 setupWalkSelectionLineEdit(ui->walkSelectionLineEdit2);
+
+                //Draw the loaded graph automatically. Use a queued call so the
+                //load progress dialog is closed before the layout starts.
+                QTimer::singleShot(0, this, &MainWindow::drawGraph);
     });
     connect(watcher, SIGNAL(finished()), progress, SLOT(deleteLater()));
     connect(watcher, SIGNAL(finished()), watcher, SLOT(deleteLater()));

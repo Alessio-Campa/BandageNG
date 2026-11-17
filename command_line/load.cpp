@@ -26,7 +26,7 @@
 
 CLI::App *addLoadSubcommand(CLI::App &app, LoadCmd &cmd) {
     auto *load = app.add_subcommand("load", "Launch the BandageNG GUI and load a graph file");
-    load->add_flag("--draw", cmd.m_draw, "Draw graph after loading");
+    load->add_flag("--draw", cmd.m_draw, "Draw graph after loading (now done automatically; kept for compatibility)");
     load->add_option("<graph>", cmd.m_graph, "A graph file of any type supported by Bandage")
             ->required()->check(CLI::ExistingFile);
 
