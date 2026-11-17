@@ -116,6 +116,15 @@ bool ruleMatches(const QString &value, const TagColourRule &rule)
             return value.startsWith(rule.value, Qt::CaseInsensitive);
         case TagMatchType::EndsWith:
             return value.endsWith(rule.value, Qt::CaseInsensitive);
+        case TagMatchType::CsvIncludes: {
+            const QStringList elements = value.split(QLatin1Char(','), Qt::KeepEmptyParts);
+            const QString wanted = rule.value.trimmed();
+            for (const QString &element : elements) {
+                if (element.trimmed().compare(wanted, Qt::CaseInsensitive) == 0)
+                    return true;
+            }
+            return false;
+        }
     }
 
     return false;

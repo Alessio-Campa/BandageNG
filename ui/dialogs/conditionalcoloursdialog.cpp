@@ -27,18 +27,23 @@ ConditionalColoursDialog::ConditionalColoursDialog(QWidget *parent) :
 
     auto *description = new QLabel(
             "Rules are checked from top to bottom and the first matching rule wins. "
-            "Matching is case-insensitive. Nodes that do not match any rule use the default colour.",
+            "Matching is case-insensitive. New rule colours start from the tag colour palette "
+            "and can be changed freely. Nodes that do not match any rule use the default colour.",
             this);
     description->setWordWrap(true);
     layout->addWidget(description);
 
     m_table = new QTableWidget(0, 4, this);
     m_table->setHorizontalHeaderLabels({"Tag", "Match", "Value", "Colour"});
-    m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
+    m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
     m_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
-    m_table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    m_table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Interactive);
+    m_table->setColumnWidth(0, 110);
+    m_table->setColumnWidth(1, 150);
+    m_table->setColumnWidth(3, 120);
     m_table->verticalHeader()->setVisible(false);
+    m_table->verticalHeader()->setDefaultSectionSize(32);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
 
@@ -101,31 +106,41 @@ QStringList ConditionalColoursDialog::availableTagNames() const
 void ConditionalColoursDialog::addRuleRow(int row, const TagColourRule &rule)
 {
     m_table->insertRow(row);
+    m_table->setRowHeight(row, 32);
 
     auto *tagCombo = new QComboBox(m_table);
     tagCombo->setEditable(true);
     tagCombo->setInsertPolicy(QComboBox::NoInsert);
     tagCombo->addItems(m_tagNames);
     tagCombo->setCurrentText(rule.tagName);
+    tagCombo->setMinimumWidth(90);
     m_table->setCellWidget(row, 0, tagCombo);
 
     auto *matchCombo = new QComboBox(m_table);
     matchCombo->addItem("equals", int(TagMatchType::Equals));
     matchCombo->addItem("contains", int(TagMatchType::Contains));
+    matchCombo->addItem("csv includes", int(TagMatchType::CsvIncludes));
     matchCombo->addItem("starts with", int(TagMatchType::StartsWith));
     matchCombo->addItem("ends with", int(TagMatchType::EndsWith));
     const int matchIndex = matchCombo->findData(int(rule.matchType));
     matchCombo->setCurrentIndex(matchIndex >= 0 ? matchIndex : 0);
+    matchCombo->setMinimumWidth(130);
     m_table->setCellWidget(row, 1, matchCombo);
 
     auto *valueEdit = new QLineEdit(rule.value, m_table);
     m_table->setCellWidget(row, 2, valueEdit);
 
+    QColor colour = rule.colour;
+    if (!colour.isValid()) {
+        QVector<QColor> palette = g_settings->tagColourPalette;
+        if (palette.isEmpty())
+            palette = Settings::defaultTagColourPalette();
+        colour = palette.isEmpty() ? g_settings->conditionalColour
+                                   : palette[row % palette.size()];
+    }
+
     auto *colourButton = new ColourButton(m_table);
     colourButton->m_name = "Rule colour";
-    QColor colour = rule.colour;
-    if (!colour.isValid())
-        colour = m_defaultColourButton ? m_defaultColourButton->m_colour : g_settings->conditionalColour;
     colourButton->setColour(colour);
     m_table->setCellWidget(row, 3, colourButton);
 }
@@ -151,9 +166,14 @@ TagColourRule ConditionalColoursDialog::ruleAt(int row) const
 
 void ConditionalColoursDialog::addRule()
 {
+    QVector<QColor> palette = g_settings->tagColourPalette;
+    if (palette.isEmpty())
+        palette = Settings::defaultTagColourPalette();
+
     TagColourRule rule;
-    rule.colour = m_defaultColourButton ? m_defaultColourButton->m_colour
-                                        : g_settings->conditionalColour;
+    rule.colour = palette.isEmpty()
+            ? g_settings->conditionalColour
+            : palette[m_table->rowCount() % palette.size()];
     addRuleRow(m_table->rowCount(), rule);
     m_table->setCurrentCell(m_table->rowCount() - 1, 0);
 }

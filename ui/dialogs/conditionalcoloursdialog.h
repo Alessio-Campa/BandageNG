@@ -6,6 +6,7 @@
 #include <QStringList>
 
 class ColourButton;
+class QComboBox;
 class QTableWidget;
 
 class ConditionalColoursDialog : public QDialog

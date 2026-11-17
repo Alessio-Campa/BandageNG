@@ -93,7 +93,8 @@ enum class TagMatchType {
     Equals,
     Contains,
     StartsWith,
-    EndsWith
+    EndsWith,
+    CsvIncludes
 };
 
 struct TagColourRule {
