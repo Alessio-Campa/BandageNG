@@ -492,6 +492,95 @@ void GraphicsItemNode::shiftPoints(QPointF difference)
     }
 }
 
+//Makes the node a straight line with its original centre and drawn length,
+//oriented from the middle of its predecessors' ends to the middle of its
+//successors' starts. Calling it again restores the pre-straightening shape.
+void GraphicsItemNode::straightenBetweenNeighbours()
+{
+    if (m_isStraightened) {
+        prepareGeometryChange();
+        m_linePoints.assign(m_pointsBeforeStraightening.begin(),
+                            m_pointsBeforeStraightening.end());
+        m_pointsBeforeStraightening.clear();
+        m_isStraightened = false;
+        remakePath();
+        return;
+    }
+
+    if (m_linePoints.size() < 2)
+        return;
+
+    const double pathLength = getNodePathLength();
+    if (pathLength <= 0.0)
+        return;
+
+    auto average = [](const std::vector<QPointF> &points) {
+        QPointF sum;
+        for (const auto &point : points)
+            sum += point;
+        return sum / double(points.size());
+    };
+
+    std::vector<QPointF> predecessorEnds;
+    for (auto *edge : m_deBruijnNode->getEnteringEdges()) {
+        //A self loop is not a real neighbour.
+        if (edge->getStartingNode() == m_deBruijnNode)
+            continue;
+
+        const QLineF start = edgegeometry::startSegment(edge);
+        if (!start.isNull())
+            predecessorEnds.push_back(start.p2());
+    }
+
+    std::vector<QPointF> successorStarts;
+    for (auto *edge : m_deBruijnNode->getLeavingEdges()) {
+        if (edge->getEndingNode() == m_deBruijnNode)
+            continue;
+
+        const QLineF end = edgegeometry::endSegment(edge);
+        if (!end.isNull())
+            successorStarts.push_back(end.p1());
+    }
+
+    const bool hasPredecessor = !predecessorEnds.empty();
+    const bool hasSuccessor = !successorStarts.empty();
+
+    QPointF direction = m_linePoints.back() - m_linePoints.front();
+    if (hasPredecessor && hasSuccessor) {
+        direction = average(successorStarts) - average(predecessorEnds);
+    } else if (hasPredecessor) {
+        direction = m_linePoints.back() - average(predecessorEnds);
+    } else if (hasSuccessor) {
+        direction = average(successorStarts) - m_linePoints.front();
+    }
+
+    const double directionLength = std::hypot(direction.x(), direction.y());
+    if (directionLength <= 0.0) {
+        direction = m_linePoints.back() - m_linePoints.front();
+        const double fallbackLength = std::hypot(direction.x(), direction.y());
+        if (fallbackLength <= 0.0)
+            return;
+        direction /= fallbackLength;
+    } else {
+        direction /= directionLength;
+    }
+
+    const QPointF oldCentre = getCentre(m_linePoints);
+    const QPointF first = oldCentre - direction * (pathLength / 2.0);
+    const QPointF last = oldCentre + direction * (pathLength / 2.0);
+
+    const size_t count = m_linePoints.size();
+    m_pointsBeforeStraightening.assign(m_linePoints.begin(), m_linePoints.end());
+    m_isStraightened = true;
+
+    prepareGeometryChange();
+    for (size_t i = 0; i < count; ++i) {
+        const double fraction = double(i) / double(count - 1);
+        m_linePoints[i] = first + (last - first) * fraction;
+    }
+    remakePath();
+}
+
 void GraphicsItemNode::remakePath()
 {
     QPainterPath path;

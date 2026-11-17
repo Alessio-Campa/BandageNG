@@ -61,10 +61,12 @@ QPainterPath GraphicsItemEdge::shape() const {
     return stroker.createStroke(path());
 }
 
-static void getControlPointLocations(const DeBruijnEdge *edge,
-                                     QLineF &start, QLineF &end) {
+namespace edgegeometry {
+
+QLineF startSegment(const DeBruijnEdge *edge)
+{
+    QLineF start;
     DeBruijnNode *startingNode = edge->getStartingNode();
-    DeBruijnNode *endingNode = edge->getEndingNode();
 
     if (const auto *startingGraphicsItemNode = startingNode->getGraphicsItemNode()) {
         start = startingGraphicsItemNode->getLastSegment();
@@ -74,6 +76,14 @@ static void getControlPointLocations(const DeBruijnEdge *edge,
         start.setPoints(segment.p2(), segment.p1());
     }
 
+    return start;
+}
+
+QLineF endSegment(const DeBruijnEdge *edge)
+{
+    QLineF end;
+    DeBruijnNode *endingNode = edge->getEndingNode();
+
     if (const auto *endingGraphicsItemNode = endingNode->getGraphicsItemNode()) {
         end = endingGraphicsItemNode->getFirstSegment();
     } else if (const auto *endingGraphicsItemRcNode
@@ -81,6 +91,16 @@ static void getControlPointLocations(const DeBruijnEdge *edge,
         auto segment = endingGraphicsItemRcNode->getLastSegment();
         end.setPoints(segment.p2(), segment.p1());
     }
+
+    return end;
+}
+
+}
+
+static void getControlPointLocations(const DeBruijnEdge *edge,
+                                     QLineF &start, QLineF &end) {
+    start = edgegeometry::startSegment(edge);
+    end = edgegeometry::endSegment(edge);
 }
 
 static QPointF extendLine(QLineF line, double extensionLength) {

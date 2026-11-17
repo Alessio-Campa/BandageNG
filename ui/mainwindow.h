@@ -170,6 +170,7 @@ private slots:
     void selectNone();
     void invertSelection();
     void zoomToSelection();
+    void straightenNodeOnDoubleClick(DeBruijnNode *node);
     void selectContiguous();
     void selectMaybeContiguous();
     void selectNotContiguous();

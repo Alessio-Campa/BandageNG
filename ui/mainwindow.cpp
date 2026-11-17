@@ -281,6 +281,7 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     connect(ui->nodeWidthSpinBox, SIGNAL(valueChanged(double)), this, SLOT(nodeWidthChanged()));
     connect(g_graphicsView, SIGNAL(copySelectedSequencesToClipboard()), this, SLOT(copySelectedSequencesToClipboard()));
     connect(g_graphicsView, SIGNAL(saveSelectedSequencesToFile()), this, SLOT(saveSelectedSequencesToFile()));
+    connect(g_graphicsView, SIGNAL(doubleClickedNode(DeBruijnNode*)), this, SLOT(straightenNodeOnDoubleClick(DeBruijnNode*)));
     connect(ui->actionSave_entire_graph_to_FASTA, SIGNAL(triggered(bool)), this, SLOT(saveEntireGraphToFasta()));
     connect(ui->actionSave_entire_graph_to_FASTA_only_positive_nodes, SIGNAL(triggered(bool)), this, SLOT(saveEntireGraphToFastaOnlyPositiveNodes()));
     connect(ui->actionSave_entire_graph_to_GFA, SIGNAL(triggered(bool)), this, SLOT(saveEntireGraphToGfa()));
@@ -2690,6 +2691,24 @@ void MainWindow::nodeWidthChanged()
 {
     g_assemblyGraph->recalculateAllNodeWidths(ui->nodeWidthSpinBox->value(),
                                               g_settings->depthPower, g_settings->depthEffectOnWidth);
+    g_graphicsView->viewport()->update();
+}
+
+
+void MainWindow::straightenNodeOnDoubleClick(DeBruijnNode *node)
+{
+    if (!node)
+        return;
+
+    GraphicsItemNode *graphicsNode = node->getGraphicsItemNode();
+    if (!graphicsNode)
+        return;
+
+    graphicsNode->straightenBetweenNeighbours();
+
+    std::vector<GraphicsItemNode *> movedNodes{graphicsNode};
+    graphicsNode->fixEdgePaths(&movedNodes);
+    m_scene->possiblyExpandSceneRectangle(&movedNodes);
     g_graphicsView->viewport()->update();
 }
 

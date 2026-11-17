@@ -56,6 +56,8 @@ public:
     float m_width;
     size_t m_grabIndex : 31;
     bool m_hasArrow : 1;
+    bool m_isStraightened = false;
+    std::vector<QPointF> m_pointsBeforeStraightening;
 
     static QSize getNodeTextSize(const QString& text);
     static float getNodeWidth(double depthRelativeToMeanDrawnDepth,
@@ -69,6 +71,7 @@ public:
     void paint(QPainter * painter, const QStyleOptionGraphicsItem *, QWidget *) override;
     QPainterPath shape() const override;
     void shiftPoints(QPointF difference);
+    void straightenBetweenNeighbours();
     void remakePath();
     bool usePositiveNodeColour() const;
 

@@ -22,9 +22,17 @@
 #include <QGraphicsPathItem>
 #include <QPainterPath>
 #include <QPointF>
+#include <QLineF>
 
 class DeBruijnEdge;
 class AssemblyGraph;
+
+namespace edgegeometry {
+//The drawn start/end segments of an edge, taking single/double mode and
+//reverse-complement display into account.
+QLineF startSegment(const DeBruijnEdge *edge);
+QLineF endSegment(const DeBruijnEdge *edge);
+}
 
 class GraphicsItemEdge : public QGraphicsPathItem {
 public:
