@@ -2068,6 +2068,69 @@
                 </property>
                </widget>
               </item>
+              <item row="2" column="2">
+               <widget class="InfoTextWidget" name="nodeWidthZoomCompensationInfoText" native="true">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>16</width>
+                  <height>16</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>How much node width compensates for zoom changes.&lt;br&gt;&lt;br&gt;0 keeps the width fixed in graph coordinates (nodes get thicker on screen when zooming in). 1 keeps the width constant on screen.</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="3">
+               <widget class="QLabel" name="label_4_zoom">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="text">
+                 <string>Zoom width compensation:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="4">
+               <widget class="QDoubleSpinBox" name="nodeWidthZoomCompensationSpinBox">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="focusPolicy">
+                 <enum>Qt::StrongFocus</enum>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignCenter</set>
+                </property>
+                <property name="decimals">
+                 <number>2</number>
+                </property>
+                <property name="minimum">
+                 <double>0.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.050000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.500000000000000</double>
+                </property>
+               </widget>
+              </item>
               <item row="1" column="0">
                <spacer name="horizontalSpacer_9">
                 <property name="orientation">
@@ -2100,7 +2163,7 @@
                 </property>
                </spacer>
               </item>
-              <item row="2" column="3" colspan="2">
+              <item row="3" column="3" colspan="2">
                <widget class="QWidget" name="widget_7" native="true">
                 <layout class="QHBoxLayout" name="horizontalLayout_3">
                  <property name="leftMargin">
@@ -3542,152 +3605,6 @@
             </spacer>
            </item>
            <item>
-            <widget class="QLabel" name="annotationColourHeadingLabel">
-             <property name="font">
-              <font>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>Annotation colours</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="Line" name="line_10">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="annotationColourDescriptionLabel">
-             <property name="text">
-              <string>These settings control colours used for regions without query-hit annotations.</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignJustify|Qt::AlignVCenter</set>
-             </property>
-             <property name="wordWrap">
-              <bool>true</bool>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QWidget" name="widget_21" native="true">
-             <layout class="QGridLayout" name="gridLayout_14">
-              <property name="leftMargin">
-               <number>0</number>
-              </property>
-              <property name="topMargin">
-               <number>0</number>
-              </property>
-              <property name="rightMargin">
-               <number>0</number>
-              </property>
-              <property name="bottomMargin">
-               <number>0</number>
-              </property>
-              <item row="0" column="1">
-               <widget class="InfoTextWidget" name="noHitsColourInfoText" native="true">
-                <property name="sizePolicy">
-                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                  <horstretch>0</horstretch>
-                  <verstretch>0</verstretch>
-                 </sizepolicy>
-                </property>
-                <property name="minimumSize">
-                 <size>
-                  <width>16</width>
-                  <height>16</height>
-                 </size>
-                </property>
-                <property name="toolTip">
-                 <string>This colour is used for nodes (and regions of nodes) that do not have any query-hit annotations.</string>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="3">
-               <widget class="ColourButton" name="noHitsColourButton">
-                <property name="minimumSize">
-                 <size>
-                  <width>100</width>
-                  <height>0</height>
-                 </size>
-                </property>
-                <property name="focusPolicy">
-                 <enum>Qt::StrongFocus</enum>
-                </property>
-                <property name="text">
-                 <string/>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="4">
-               <spacer name="horizontalSpacer_17">
-                <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
-                </property>
-                <property name="sizeType">
-                 <enum>QSizePolicy::Expanding</enum>
-                </property>
-                <property name="sizeHint" stdset="0">
-                 <size>
-                  <width>0</width>
-                  <height>20</height>
-                 </size>
-                </property>
-               </spacer>
-              </item>
-              <item row="0" column="2">
-               <widget class="QLabel" name="label_32">
-                <property name="sizePolicy">
-                 <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-                  <horstretch>0</horstretch>
-                  <verstretch>0</verstretch>
-                 </sizepolicy>
-                </property>
-                <property name="text">
-                 <string>No query hits:</string>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="0">
-               <spacer name="horizontalSpacer_18">
-                <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
-                </property>
-                <property name="sizeType">
-                 <enum>QSizePolicy::Expanding</enum>
-                </property>
-                <property name="sizeHint" stdset="0">
-                 <size>
-                  <width>0</width>
-                  <height>20</height>
-                 </size>
-                </property>
-               </spacer>
-              </item>
-             </layout>
-            </widget>
-           </item>
-           <item>
-            <spacer name="verticalSpacer_7">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeType">
-              <enum>QSizePolicy::Fixed</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>30</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item>
             <widget class="QLabel" name="contiguityColourSchemeHeadingLabel">
              <property name="font">
               <font>
@@ -5084,6 +5001,7 @@
   <tabstop>positionCentreRadioButton</tabstop>
   <tabstop>depthEffectOnWidthSpinBox</tabstop>
   <tabstop>depthPowerSpinBox</tabstop>
+  <tabstop>nodeWidthZoomCompensationSpinBox</tabstop>
   <tabstop>randomColourPositiveSaturationSlider</tabstop>
   <tabstop>randomColourPositiveSaturationSpinBox</tabstop>
   <tabstop>randomColourNegativeSaturationSlider</tabstop>
@@ -5103,7 +5021,6 @@
   <tabstop>depthValueManualRadioButton</tabstop>
   <tabstop>lowDepthValueSpinBox</tabstop>
   <tabstop>highDepthValueSpinBox</tabstop>
-  <tabstop>noHitsColourButton</tabstop>
   <tabstop>contiguitySearchDepthSpinBox</tabstop>
   <tabstop>contiguousStrandSpecificColourButton</tabstop>
   <tabstop>contiguousEitherStrandColourButton</tabstop>

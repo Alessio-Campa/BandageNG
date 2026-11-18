@@ -33,6 +33,9 @@ public:
     Memory();
     void clearGraphSpecificMemory();
 
+    void loadRememberedPath();
+    void saveRememberedPath() const;
+
     QString rememberedPath;
 
     CommandLineCommand commandLineCommand;

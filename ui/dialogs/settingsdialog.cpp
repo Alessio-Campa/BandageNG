@@ -57,7 +57,6 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
     ui->uniformPositiveNodeColourButton->m_name = "Uniform positive node colour";
     ui->uniformNegativeNodeColourButton->m_name = "Uniform negative node colour";
     ui->uniformNodeSpecialColourButton->m_name = "Uniform special node colour";
-    ui->noHitsColourButton->m_name = "No query hits colour";
     ui->contiguousStrandSpecificColourButton->m_name = "Contiguous (strand-specific) colour";
     ui->contiguousEitherStrandColourButton->m_name = "Contiguous (either strand) colour";
     ui->maybeContiguousColourButton->m_name = "Maybe contiguous colour";
@@ -200,6 +199,7 @@ void SettingsDialog::loadOrSaveSettingsToOrFromWidgets(bool setWidgets, Settings
     doubleFunctionPointer(&settings->componentSeparation, ui->componentSeparationSpinBox, false);
     doubleFunctionPointer(&settings->depthEffectOnWidth, ui->depthEffectOnWidthSpinBox, true);
     doubleFunctionPointer(&settings->depthPower, ui->depthPowerSpinBox, false);
+    doubleFunctionPointer(&settings->nodeWidthZoomCompensation, ui->nodeWidthZoomCompensationSpinBox, false);
     doubleFunctionPointer(&settings->edgeWidth, ui->edgeWidthSpinBox, false);
     doubleFunctionPointer(&settings->linkWidth, ui->linkWidthSpinBox, false);
     doubleFunctionPointer(&settings->outlineThickness, ui->outlineThicknessSpinBox, false);
@@ -220,7 +220,6 @@ void SettingsDialog::loadOrSaveSettingsToOrFromWidgets(bool setWidgets, Settings
     colourFunctionPointer(&settings->uniformNodeSpecialColour, ui->uniformNodeSpecialColourButton);
     doubleFunctionPointer(&settings->lowDepthValue, ui->lowDepthValueSpinBox, false);
     doubleFunctionPointer(&settings->highDepthValue, ui->highDepthValueSpinBox, false);
-    colourFunctionPointer(&settings->grayColor, ui->noHitsColourButton);
     intFunctionPointer(&settings->contiguitySearchSteps, ui->contiguitySearchDepthSpinBox);
     colourFunctionPointer(&settings->contiguousStrandSpecificColour, ui->contiguousStrandSpecificColourButton);
     colourFunctionPointer(&settings->contiguousEitherStrandColour, ui->contiguousEitherStrandColourButton);

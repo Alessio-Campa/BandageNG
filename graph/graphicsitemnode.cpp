@@ -34,6 +34,8 @@
 #include <QPainterPathStroker>
 #include <QPainter>
 #include <QPen>
+#include <QGraphicsEllipseItem>
+#include <QGraphicsScene>
 #include <QMessageBox>
 #include <QFontMetrics>
 #include <QSize>
@@ -156,6 +158,48 @@ static QPointF getCentre(const Container &linePoints) {
     //Code should never get here.
     return {};
 }
+
+class NodeEndHandle : public QGraphicsEllipseItem
+{
+public:
+    NodeEndHandle(GraphicsItemNode *node, bool firstEnd)
+            : QGraphicsEllipseItem(-5.0, -5.0, 10.0, 10.0, node),
+              m_node(node), m_firstEnd(firstEnd)
+    {
+        setBrush(QColor(255, 255, 255, 230));
+        QPen pen(g_settings->selectionColour);
+        pen.setWidthF(1.5);
+        setPen(pen);
+        setZValue(1000.0);
+        setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+        setAcceptedMouseButtons(Qt::LeftButton);
+        setCursor(Qt::SizeAllCursor);
+        setToolTip(QStringLiteral("Drag to resize and rotate the node"));
+        setVisible(false);
+    }
+
+protected:
+    void mousePressEvent(QGraphicsSceneMouseEvent *event) override
+    {
+        m_node->setSelected(true);
+        event->accept();
+    }
+
+    void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override
+    {
+        m_node->moveEndTo(m_firstEnd, event->scenePos());
+        event->accept();
+    }
+
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override
+    {
+        event->accept();
+    }
+
+private:
+    GraphicsItemNode *m_node;
+    bool m_firstEnd;
+};
 
 static bool anyNodeDisplayText() {
     return g_settings->displayNodeCustomLabels ||
@@ -494,18 +538,11 @@ void GraphicsItemNode::shiftPoints(QPointF difference)
 
 //Makes the node a straight line with its original centre and drawn length,
 //oriented from the middle of its predecessors' ends to the middle of its
-//successors' starts. Calling it again restores the pre-straightening shape.
-void GraphicsItemNode::straightenBetweenNeighbours()
+//successors' starts.
+void GraphicsItemNode::straighten()
 {
-    if (m_isStraightened) {
-        prepareGeometryChange();
-        m_linePoints.assign(m_pointsBeforeStraightening.begin(),
-                            m_pointsBeforeStraightening.end());
-        m_pointsBeforeStraightening.clear();
-        m_isStraightened = false;
-        remakePath();
+    if (m_isStraightened)
         return;
-    }
 
     if (m_linePoints.size() < 2)
         return;
@@ -581,6 +618,114 @@ void GraphicsItemNode::straightenBetweenNeighbours()
     remakePath();
 }
 
+void GraphicsItemNode::unstraighten()
+{
+    if (!m_isStraightened)
+        return;
+
+    prepareGeometryChange();
+    m_linePoints.assign(m_pointsBeforeStraightening.begin(),
+                        m_pointsBeforeStraightening.end());
+    m_pointsBeforeStraightening.clear();
+    m_isStraightened = false;
+    remakePath();
+}
+
+void GraphicsItemNode::straightenBetweenNeighbours()
+{
+    if (m_isStraightened)
+        unstraighten();
+    else
+        straighten();
+}
+
+void GraphicsItemNode::setEndHandlesVisible(bool visible)
+{
+    if (!visible && !m_firstHandle)
+        return;
+
+    ensureEndHandles();
+    m_firstHandle->setVisible(visible);
+    m_lastHandle->setVisible(visible);
+}
+
+void GraphicsItemNode::ensureEndHandles()
+{
+    if (m_firstHandle)
+        return;
+
+    m_firstHandle = new NodeEndHandle(this, true);
+    m_lastHandle = new NodeEndHandle(this, false);
+    updateEndHandlePositions();
+}
+
+void GraphicsItemNode::updateEndHandlePositions()
+{
+    if (!m_firstHandle)
+        return;
+
+    m_firstHandle->setPos(m_linePoints.front());
+    m_lastHandle->setPos(m_linePoints.back());
+}
+
+QVariant GraphicsItemNode::itemChange(GraphicsItemChange change, const QVariant &value)
+{
+    if (change == ItemSelectedHasChanged) {
+        bool singleSelectedNode = false;
+        if (value.toBool() && scene()) {
+            int selectedNodeCount = 0;
+            const auto items = scene()->selectedItems();
+            for (auto *item : items) {
+                if (dynamic_cast<GraphicsItemNode *>(item) && ++selectedNodeCount > 1)
+                    break;
+            }
+            singleSelectedNode = selectedNodeCount == 1;
+        }
+        setEndHandlesVisible(singleSelectedNode);
+    }
+
+    return QGraphicsItem::itemChange(change, value);
+}
+
+void GraphicsItemNode::moveEndTo(bool firstEnd, const QPointF &target)
+{
+    if (m_linePoints.size() < 2)
+        return;
+
+    const QPointF anchor = firstEnd ? m_linePoints.back() : m_linePoints.front();
+    const QPointF oldEnd = firstEnd ? m_linePoints.front() : m_linePoints.back();
+    const QPointF oldVector = oldEnd - anchor;
+    const QPointF newVector = target - anchor;
+
+    const double oldLength = std::hypot(oldVector.x(), oldVector.y());
+    const double newLength = std::hypot(newVector.x(), newVector.y());
+    if (oldLength <= 0.0 || newLength <= 0.0)
+        return;
+
+    const double cosAngle =
+            (oldVector.x() * newVector.x() + oldVector.y() * newVector.y()) /
+            (oldLength * newLength);
+    const double sinAngle =
+            (oldVector.x() * newVector.y() - oldVector.y() * newVector.x()) /
+            (oldLength * newLength);
+    const double scale = newLength / oldLength;
+
+    prepareGeometryChange();
+    for (auto &point : m_linePoints) {
+        const QPointF relative = point - anchor;
+        point = anchor + QPointF(
+                (relative.x() * cosAngle - relative.y() * sinAngle) * scale,
+                (relative.x() * sinAngle + relative.y() * cosAngle) * scale);
+    }
+    remakePath();
+
+    fixEdgePaths();
+    if (auto *graphicsScene = dynamic_cast<BandageGraphicsScene *>(scene())) {
+        std::vector<GraphicsItemNode *> movedNodes{this};
+        graphicsScene->possiblyExpandSceneRectangle(&movedNodes);
+    }
+}
+
 void GraphicsItemNode::remakePath()
 {
     QPainterPath path;
@@ -590,6 +735,7 @@ void GraphicsItemNode::remakePath()
         path.lineTo(m_linePoints[i]);
 
     m_path = path;
+    updateEndHandlePositions();
 }
 
 static QPointF findIntermediatePoint(QPointF p1, QPointF p2, double p1Value, double p2Value, double targetValue) {

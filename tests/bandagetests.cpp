@@ -46,8 +46,9 @@
 
 #include <QtTest/QtTest>
 #include <QDebug>
-#include <QTemporaryDir>
+#include <QGraphicsScene>
 #include <QSettings>
+#include <QTemporaryDir>
 
 #include <algorithm>
 #include <iostream>
@@ -132,6 +133,7 @@ private slots:
     void graphLayout();
     void settingsPersistence();
     void settingsDialog();
+    void nodeEndHandles();
     void commandLineSettings();
     void sciNotComparisons();
     void graphEdits();
@@ -1054,9 +1056,19 @@ void BandageTests::graphLayout() {
 
 void BandageTests::settingsPersistence() {
     //Keep the round-trip out of the user's real configuration.
-    const QSettings::Format previousFormat = QSettings::defaultFormat();
-    QSettings::setDefaultFormat(QSettings::IniFormat);
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_tmpDir.path());
+    const QByteArray settingsFileVariable = QByteArrayLiteral("BANDAGE_SETTINGS_FILE");
+    const QString settingsFile = m_tmpDir.filePath("bandage-settings.ini");
+    qputenv(settingsFileVariable, settingsFile.toUtf8());
+
+    {
+        //Unversioned settings (including values left by older test runs) are
+        //discarded instead of being loaded.
+        QSettings legacy(settingsFile, QSettings::IniFormat);
+        legacy.setValue("options/edgeLength", 99.0);
+    }
+    Settings legacyLoaded;
+    legacyLoaded.loadPersisted();
+    QCOMPARE(legacyLoaded.edgeLength.val, Settings().edgeLength.val);
 
     Settings saved;
     saved.doubleMode = true;
@@ -1066,6 +1078,7 @@ void BandageTests::settingsPersistence() {
     saved.graphScope = AROUND_NODE;
     saved.nodeDistance = 7;
     saved.startingNodes = "1+,2-";
+    saved.nodeWidthZoomCompensation = 0.35;
     saved.maxEValueProduct = SciNot(3.3, -7);
     saved.tagColourRules = {TagColourRule{"tag", TagMatchType::Contains, "value", QColor(1, 2, 3)}};
     saved.tagValueColours.insert(Settings::tagValueColourKey("tag", "value"), QColor(4, 5, 6));
@@ -1081,6 +1094,8 @@ void BandageTests::settingsPersistence() {
     QCOMPARE(loaded.edgeColour, saved.edgeColour);
     QCOMPARE(loaded.graphScope, saved.graphScope);
     QCOMPARE(loaded.nodeDistance.val, saved.nodeDistance.val);
+    QCOMPARE(loaded.nodeWidthZoomCompensation.val,
+             saved.nodeWidthZoomCompensation.val);
     QCOMPARE(loaded.startingNodes, saved.startingNodes);
     QCOMPARE(loaded.maxEValueProduct.val.getCoefficient(),
              saved.maxEValueProduct.val.getCoefficient());
@@ -1095,13 +1110,39 @@ void BandageTests::settingsPersistence() {
              QColor(4, 5, 6));
     QCOMPARE(loaded.tagColourPalette, saved.tagColourPalette);
 
-    QSettings::setDefaultFormat(previousFormat);
+    qunsetenv(settingsFileVariable);
 }
 
 void BandageTests::settingsDialog() {
     SettingsDialog dialog;
     dialog.setWidgetsFromSettings();
     dialog.setSettingsFromWidgets();
+}
+
+void BandageTests::nodeEndHandles() {
+    DeBruijnNode node("1+", 1.0, Sequence("ACGT"), 4);
+    QGraphicsScene scene;
+    auto *item = new GraphicsItemNode(&node, 1.0,
+                                      std::vector<QPointF>{QPointF(0.0, 0.0), QPointF(10.0, 0.0)});
+    scene.addItem(item);
+    item->setFlag(QGraphicsItem::ItemIsSelectable, true);
+    item->setSelected(true);
+
+    QCOMPARE(int(item->childItems().size()), 2);
+    for (auto *child : item->childItems())
+        QVERIFY(child->isVisible());
+
+    //Drag the last end: the first end stays anchored while the node rotates and
+    //stretches to reach the new position.
+    item->moveEndTo(false, QPointF(10.0, 10.0));
+    QVERIFY(qAbs(item->getFirst().x()) < 1e-9);
+    QVERIFY(qAbs(item->getFirst().y()) < 1e-9);
+    QVERIFY(qAbs(item->getLast().x() - 10.0) < 1e-9);
+    QVERIFY(qAbs(item->getLast().y() - 10.0) < 1e-9);
+
+    item->setSelected(false);
+    for (auto *child : item->childItems())
+        QVERIFY(!child->isVisible());
 }
 
 static void parseSettings(const QStringList &commandLineSettings) {

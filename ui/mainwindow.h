@@ -92,6 +92,7 @@ private:
     void selectBasedOnContiguity(ContiguityStatus contiguityStatus);
     void setWidgetsFromSettings();
     void saveSettingsFromWidgets();
+    void updateStraightenButtonText();
     void scaleNodeWidthsForZoom(double zoomFactor);
     QString getDefaultImageFileName();
     void setGraphScopeComboBox(GraphScope graphScope);
@@ -172,6 +173,7 @@ private slots:
     void invertSelection();
     void zoomToSelection();
     void straightenNodeOnDoubleClick(DeBruijnNode *node);
+    void straightenSelectedNodes();
     void selectContiguous();
     void selectMaybeContiguous();
     void selectNotContiguous();

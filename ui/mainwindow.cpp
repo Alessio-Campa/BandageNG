@@ -249,6 +249,9 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
 
     ui->setupUi(this);
 
+    //Remember the last directory used for opening/saving files.
+    g_memory->loadRememberedPath();
+
     //Wheel scrolling over value widgets should scroll the page instead of
     //changing their values, everywhere in the application.
     qApp->installEventFilter(new WheelValueGuard(qApp));
@@ -364,6 +367,7 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     connect(ui->fontButton, SIGNAL(clicked()), this, SLOT(fontButtonPressed()));
     connect(ui->setNodeCustomColourButton, SIGNAL(clicked()), this, SLOT(setNodeCustomColour()));
     connect(ui->setNodeCustomLabelButton, SIGNAL(clicked()), this, SLOT(setNodeCustomLabel()));
+    connect(ui->straightenSelectedNodesButton, SIGNAL(clicked()), this, SLOT(straightenSelectedNodes()));
     connect(ui->actionSettings, SIGNAL(triggered()), this, SLOT(openSettingsDialog()));
     connect(ui->selectNodesButton, SIGNAL(clicked()), this, SLOT(selectUserSpecifiedNodes()));
     connect(ui->pathSelectButton, SIGNAL(clicked()), this, SLOT(selectPathNodes()));
@@ -450,6 +454,7 @@ MainWindow::~MainWindow() {
     //some graph-specific values).
     saveSettingsFromWidgets();
     g_settings->savePersisted();
+    g_memory->saveRememberedPath();
 
     cleanUp();
     delete m_graphicsViewZoom;
@@ -606,8 +611,8 @@ void MainWindow::loadGraph(QString fullFileName) {
 
                 // If the graph doesn't have custom colours, but the colour scheme is on 'Custom', automatically switch it back
                 // to the default of 'Random colours'.
-                if (!customColours && ui->coloursComboBox->currentIndex() == 6)
-                    ui->coloursComboBox->setCurrentIndex(0);
+                if (!customColours && ui->coloursComboBox->currentIndex() == CUSTOM_COLOURS)
+                    ui->coloursComboBox->setCurrentIndex(RANDOM_COLOURS);
 
                 setupPathSelectionLineEdit(ui->pathSelectionLineEdit);
                 setupPathSelectionLineEdit(ui->pathSelectionLineEdit2);
@@ -811,6 +816,14 @@ void MainWindow::selectionChanged()
 {
     std::vector<DeBruijnNode *> selectedNodes = m_scene->getSelectedNodes();
     std::vector<DeBruijnEdge *> selectedEdges = m_scene->getSelectedEdges();
+
+    updateStraightenButtonText();
+
+    const std::vector<GraphicsItemNode *> selectedGraphicsNodes =
+            m_scene->getSelectedGraphicsItemNodes();
+    const bool showEndHandles = selectedGraphicsNodes.size() == 1;
+    for (auto *node : selectedGraphicsNodes)
+        node->setEndHandlesVisible(showEndHandles);
 
     if (selectedNodes.empty())
     {
@@ -2861,6 +2874,46 @@ void MainWindow::straightenNodeOnDoubleClick(DeBruijnNode *node)
     graphicsNode->fixEdgePaths(&movedNodes);
     m_scene->possiblyExpandSceneRectangle(&movedNodes);
     g_graphicsView->viewport()->update();
+    updateStraightenButtonText();
+}
+
+
+void MainWindow::straightenSelectedNodes()
+{
+    std::vector<GraphicsItemNode *> selectedNodes = m_scene->getSelectedGraphicsItemNodes();
+    if (selectedNodes.empty())
+        return;
+
+    const bool allStraightened =
+            std::all_of(selectedNodes.begin(), selectedNodes.end(),
+                        [](GraphicsItemNode *node) { return node->isStraightened(); });
+
+    for (auto *node : selectedNodes) {
+        if (allStraightened)
+            node->unstraighten();
+        else if (!node->isStraightened())
+            node->straighten();
+    }
+
+    selectedNodes.front()->fixEdgePaths(&selectedNodes);
+    m_scene->possiblyExpandSceneRectangle(&selectedNodes);
+    g_graphicsView->viewport()->update();
+    updateStraightenButtonText();
+}
+
+
+void MainWindow::updateStraightenButtonText()
+{
+    const std::vector<GraphicsItemNode *> selectedNodes = m_scene->getSelectedGraphicsItemNodes();
+    const bool allStraightened =
+            !selectedNodes.empty() &&
+            std::all_of(selectedNodes.begin(), selectedNodes.end(),
+                        [](GraphicsItemNode *node) { return node->isStraightened(); });
+
+    ui->straightenSelectedNodesButton->setText(allStraightened ? tr("Unstraighten") : tr("Straighten"));
+    ui->straightenSelectedNodesButton->setToolTip(
+            allStraightened ? tr("Restore the previous shape of the selected nodes.")
+                            : tr("Straighten the selected nodes."));
 }
 
 
@@ -2872,9 +2925,9 @@ void MainWindow::scaleNodeWidthsForZoom(double zoomFactor)
     //Node widths are stored in scene coordinates. Partially compensating for
     //the zoom change means the on-screen thickness still grows a bit when
     //zooming in, but much more slowly than the rest of the graph. A factor of
-    //1.0 would keep the width perfectly constant on screen; 0.0 would leave it
-    //untouched in scene coordinates.
-    constexpr double compensation = 0.5;
+    //1.0 keeps the width perfectly constant on screen; 0.0 leaves it untouched
+    //in scene coordinates.
+    const double compensation = g_settings->nodeWidthZoomCompensation;
     const double widthScale = std::pow(zoomFactor, -compensation);
     for (auto *node : g_assemblyGraph->m_deBruijnGraphNodes) {
         if (GraphicsItemNode *graphicsItemNode = node->getGraphicsItemNode())

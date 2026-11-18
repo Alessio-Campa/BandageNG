@@ -44,6 +44,7 @@ Settings::Settings()
     averageNodeWidth = FloatSetting(5.0, 0.5, 1000.0);
     depthEffectOnWidth = FloatSetting(0.5, 0.0, 1.0);
     depthPower = FloatSetting(0.5, 0.0, 1.0);
+    nodeWidthZoomCompensation = FloatSetting(0.5, 0.0, 1.0);
 
     jumpsAsLinks = false;
     edgeWidth = FloatSetting(1.5, 0.1, 100);
@@ -111,8 +112,6 @@ Settings::Settings()
     maybeContiguousColour = QColor(190, 240, 190);
     notContiguousColour = QColor(220, 220, 220);
     contiguityStartingColour = QColor(0, 255, 0);
-
-    grayColor = QColor(220, 220, 220);
 
     autoDepthValue = true;
     lowDepthValue = FloatSetting(5.0, 0.0, 1000000.0);
@@ -186,6 +185,7 @@ namespace {
 //All persisted options live in their own settings group so they cannot clash
 //with other values (e.g. the recent file list).
 const QString optionsPrefix = QStringLiteral("options/");
+constexpr int persistedSettingsVersion = 1;
 
 QString optionKey(const char *name)
 {
@@ -194,6 +194,11 @@ QString optionKey(const char *name)
 
 QSettings persistentSettings()
 {
+    //Tests (and power users) can redirect persistence to a custom ini file.
+    const QByteArray overrideFile = qgetenv("BANDAGE_SETTINGS_FILE");
+    if (!overrideFile.isEmpty())
+        return QSettings(QString::fromLocal8Bit(overrideFile), QSettings::IniFormat);
+
     return QSettings("BandageNG", "BandageNG");
 }
 
@@ -316,6 +321,13 @@ void Settings::loadPersisted()
 {
     QSettings settings = persistentSettings();
 
+    //Older test runs wrote unversioned fixture values into the real settings.
+    //Treat those as stale and start from defaults.
+    if (settings.value(optionKey("version"), 0).toInt() != persistedSettingsVersion) {
+        settings.remove("options");
+        return;
+    }
+
     loadValue(settings, "doubleMode", doubleMode);
     loadEnum(settings, "nodeLengthMode", nodeLengthMode, AUTO_NODE_LENGTH, MANUAL_NODE_LENGTH);
     loadFloat(settings, "manualNodeLengthPerMegabase", manualNodeLengthPerMegabase);
@@ -329,6 +341,7 @@ void Settings::loadPersisted()
 
     loadFloat(settings, "depthEffectOnWidth", depthEffectOnWidth);
     loadFloat(settings, "depthPower", depthPower);
+    loadFloat(settings, "nodeWidthZoomCompensation", nodeWidthZoomCompensation);
     loadFloat(settings, "edgeWidth", edgeWidth);
     loadFloat(settings, "linkWidth", linkWidth);
     loadFloat(settings, "outlineThickness", outlineThickness);
@@ -359,7 +372,6 @@ void Settings::loadPersisted()
     loadValue(settings, "notContiguousColour", notContiguousColour);
     loadValue(settings, "contiguityStartingColour", contiguityStartingColour);
 
-    loadValue(settings, "grayColor", grayColor);
     loadValue(settings, "autoDepthValue", autoDepthValue);
     loadFloat(settings, "lowDepthValue", lowDepthValue);
     loadFloat(settings, "highDepthValue", highDepthValue);
@@ -465,6 +477,7 @@ void Settings::loadPersisted()
 void Settings::savePersisted() const
 {
     QSettings settings = persistentSettings();
+    settings.setValue(optionKey("version"), persistedSettingsVersion);
 
     saveValue(settings, "doubleMode", doubleMode);
     saveEnum(settings, "nodeLengthMode", int(nodeLengthMode));
@@ -479,6 +492,7 @@ void Settings::savePersisted() const
 
     saveFloat(settings, "depthEffectOnWidth", depthEffectOnWidth);
     saveFloat(settings, "depthPower", depthPower);
+    saveFloat(settings, "nodeWidthZoomCompensation", nodeWidthZoomCompensation);
     saveFloat(settings, "edgeWidth", edgeWidth);
     saveFloat(settings, "linkWidth", linkWidth);
     saveFloat(settings, "outlineThickness", outlineThickness);
@@ -509,7 +523,6 @@ void Settings::savePersisted() const
     saveValue(settings, "notContiguousColour", notContiguousColour);
     saveValue(settings, "contiguityStartingColour", contiguityStartingColour);
 
-    saveValue(settings, "grayColor", grayColor);
     saveValue(settings, "autoDepthValue", autoDepthValue);
     saveFloat(settings, "lowDepthValue", lowDepthValue);
     saveFloat(settings, "highDepthValue", highDepthValue);

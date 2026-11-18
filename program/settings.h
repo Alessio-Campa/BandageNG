@@ -131,6 +131,7 @@ public:
     FloatSetting averageNodeWidth;
     FloatSetting depthEffectOnWidth;
     FloatSetting depthPower;
+    FloatSetting nodeWidthZoomCompensation;
 
     bool jumpsAsLinks;
     FloatSetting edgeWidth;
@@ -205,8 +206,6 @@ public:
     QColor maybeContiguousColour;
     QColor notContiguousColour;
     QColor contiguityStartingColour;
-
-    QColor grayColor;
 
     bool autoDepthValue;
     FloatSetting lowDepthValue;

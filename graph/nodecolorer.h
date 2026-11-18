@@ -25,16 +25,15 @@ class GraphicsItemNode;
 
 // This needs to be synchronizes with selection combo box!
 enum NodeColorScheme : int {
-    GRAY_COLOR = 0,
-    RANDOM_COLOURS = 1,
-    UNIFORM_COLOURS = 2,
-    DEPTH_COLOUR = 3,
-    CONTIGUITY_COLOUR = 4,
-    CUSTOM_COLOURS = 5,
-    GC_CONTENT = 6,
-    TAG_VALUE = 7,
-    CSV_COLUMN = 8,
-    CONDITIONAL_COLOURS = 9,
+    RANDOM_COLOURS = 0,
+    UNIFORM_COLOURS,
+    DEPTH_COLOUR,
+    CONTIGUITY_COLOUR,
+    CUSTOM_COLOURS,
+    GC_CONTENT,
+    TAG_VALUE,
+    CSV_COLUMN,
+    CONDITIONAL_COLOURS,
     LAST_SCHEME = CONDITIONAL_COLOURS
 };
 

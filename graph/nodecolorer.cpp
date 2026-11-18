@@ -60,8 +60,6 @@ std::unique_ptr<INodeColorer> INodeColorer::create(NodeColorScheme scheme) {
             return std::make_unique<ContiguityNodeColorer>(scheme);
         case CUSTOM_COLOURS:
             return std::make_unique<CustomNodeColorer>(scheme);
-        case GRAY_COLOR:
-            return std::make_unique<GrayNodeColorer>(scheme);
         case GC_CONTENT:
             return std::make_unique<GCNodeColorer>(scheme);
         case TAG_VALUE:
@@ -202,10 +200,6 @@ std::pair<QColor, QColor> RandomNodeColorer::get(const GraphicsItemNode *node, c
         std::swap(posColour, negColour);
 
     return { posColour, negColour };
-}
-
-QColor GrayNodeColorer::get(const GraphicsItemNode *node) {
-    return g_settings->grayColor;
 }
 
 QColor CustomNodeColorer::get(const GraphicsItemNode *node) {

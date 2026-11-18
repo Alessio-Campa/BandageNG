@@ -33,6 +33,7 @@
 
 class DeBruijnNode;
 class Path;
+class NodeEndHandle;
 
 class GraphicsItemNode : public QGraphicsItem
 {
@@ -58,6 +59,8 @@ public:
     bool m_hasArrow : 1;
     bool m_isStraightened = false;
     std::vector<QPointF> m_pointsBeforeStraightening;
+    NodeEndHandle *m_firstHandle = nullptr;
+    NodeEndHandle *m_lastHandle = nullptr;
 
     static QSize getNodeTextSize(const QString& text);
     static float getNodeWidth(double depthRelativeToMeanDrawnDepth,
@@ -71,9 +74,15 @@ public:
     void paint(QPainter * painter, const QStyleOptionGraphicsItem *, QWidget *) override;
     QPainterPath shape() const override;
     void shiftPoints(QPointF difference);
+    void straighten();
+    void unstraighten();
     void straightenBetweenNeighbours();
+    [[nodiscard]] bool isStraightened() const { return m_isStraightened; }
+    void setEndHandlesVisible(bool visible);
+    void moveEndTo(bool firstEnd, const QPointF &target);
     void remakePath();
     bool usePositiveNodeColour() const;
+    QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
 
     QPointF getFirst() const {return m_linePoints.front();}
     QPointF getSecond() const {return m_linePoints[1];}
@@ -110,4 +119,6 @@ private:
     void pathHighlightNode2(QPainter * painter, DeBruijnNode * node, bool reverse, Path * path);
     QPainterPath buildPartialHighlightPath(double startFraction, double endFraction, bool reverse);
     void shiftPointSideways(bool left);
+    void ensureEndHandles();
+    void updateEndHandlePositions();
 };

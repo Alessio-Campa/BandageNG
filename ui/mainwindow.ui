@@ -966,11 +966,6 @@ When in double mode, you can include '+' or '-' at the end of the node name to s
                 </property>
                 <item>
                  <property name="text">
-                  <string>Gray color</string>
-                 </property>
-                </item>
-                <item>
-                 <property name="text">
                   <string>Random colours</string>
                  </property>
                 </item>
@@ -2535,6 +2530,19 @@ then colour which other nodes in the graph are likely to be contiguous
              </property>
             </widget>
            </item>
+           <item row="1" column="1">
+            <widget class="QPushButton" name="straightenSelectedNodesButton">
+             <property name="focusPolicy">
+              <enum>Qt::StrongFocus</enum>
+             </property>
+             <property name="toolTip">
+              <string>Straighten the selected nodes. Press again to restore their previous shape.</string>
+             </property>
+             <property name="text">
+              <string>Straighten</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
@@ -3226,6 +3234,7 @@ then colour which other nodes in the graph are likely to be contiguous
   <tabstop>nodeLengthsCheckBox</tabstop>
   <tabstop>nodeDepthCheckBox</tabstop>
   <tabstop>setNodeCustomLabelButton</tabstop>
+  <tabstop>straightenSelectedNodesButton</tabstop>
   <tabstop>csvCheckBox</tabstop>
   <tabstop>csvComboBox</tabstop>
   <tabstop>fontButton</tabstop>

@@ -52,14 +52,6 @@ public:
     [[nodiscard]] const char* name() const override { return "Random colors"; };
 };
 
-class GrayNodeColorer : public INodeColorer {
-public:
-    using INodeColorer::INodeColorer;
-
-    QColor get(const GraphicsItemNode *node) override;
-    [[nodiscard]] const char* name() const override { return "Gray colors"; };
-};
-
 class CustomNodeColorer : public INodeColorer {
 public:
     using INodeColorer::INodeColorer;

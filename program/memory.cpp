@@ -19,6 +19,7 @@
 #include "memory.h"
 
 #include <QDir>
+#include <QSettings>
 
 Memory::Memory()
 {
@@ -34,6 +35,20 @@ Memory::Memory()
     userSpecifiedPathCircular = false;
 
     terminalWidth = 80;
+}
+
+void Memory::loadRememberedPath()
+{
+    QSettings settings("BandageNG", "BandageNG");
+    const QString path = settings.value("lastDirectory").toString();
+    if (!path.isEmpty() && QDir(path).exists())
+        rememberedPath = path;
+}
+
+void Memory::saveRememberedPath() const
+{
+    QSettings settings("BandageNG", "BandageNG");
+    settings.setValue("lastDirectory", rememberedPath);
 }
 
 
