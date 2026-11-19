@@ -1,0 +1,80 @@
+name: Windows portable build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ dev ]
+    paths:
+      - "CMakeLists.txt"
+      - "VERSION.txt"
+      - ".github/workflows/windows-portable.yml"
+      - "**/*.cpp"
+      - "**/*.h"
+      - "**/*.ui"
+      - "**/*.qrc"
+      - "**/*.icns"
+      - "**/*.rc"
+
+env:
+  BUILD_TYPE: Release
+  QT_VERSION: 6.9.2
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          cache: true
+          cache-key-prefix: windows-portable-Qt
+
+      - name: Configure CMake
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+
+      - name: Build
+        run: cmake --build build --config ${{ env.BUILD_TYPE }}
+
+      - name: Package portable application
+        shell: pwsh
+        run: |
+          $dist = "dist\BandageNG-Windows-x64"
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+          Copy-Item "build\BandageNG.exe" $dist
+
+          windeployqt --release --no-translations --compiler-runtime "$dist\BandageNG.exe"
+
+          @"
+          BandageNG for Windows (portable build)
+
+          Unzip this archive and run BandageNG.exe.
+
+          The Qt runtime libraries are included. NCBI BLAST / HMMER / minimap2
+          are NOT bundled; install them and add them to PATH if you want to use
+          the graph search features.
+
+          Command-line usage is also available, e.g.:
+              BandageNG.exe info graph.gfa
+          "@ | Set-Content -Encoding ASCII "$dist\README.txt"
+
+          Compress-Archive -Path "$dist\*" -DestinationPath "BandageNG-Windows-x64.zip"
+
+      - name: Upload portable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: BandageNG-Windows-x64
+          path: BandageNG-Windows-x64.zip
+          if-no-files-found: error
