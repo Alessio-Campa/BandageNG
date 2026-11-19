@@ -15,6 +15,9 @@ on:
       - "**/*.icns"
       - "**/*.rc"
 
+permissions:
+  contents: write
+
 env:
   BUILD_TYPE: Release
   QT_VERSION: 6.9.2
@@ -78,3 +81,18 @@ jobs:
           name: BandageNG-Windows-x64
           path: BandageNG-Windows-x64.zip
           if-no-files-found: error
+
+      - name: Publish portable release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-portable
+          name: BandageNG Windows portable build
+          body: |
+            Portable Windows x64 build with the Qt runtime included.
+
+            Download `BandageNG-Windows-x64.zip`, unzip it, and run
+            `BandageNG.exe`.
+          files: BandageNG-Windows-x64.zip
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
