@@ -35,11 +35,16 @@
 #include <QLineEdit>
 #include <QRectF>
 #include <QThread>
+#include <memory>
 
 Q_MOC_INCLUDE("graph/debruijnnode.h")
 
 class GraphicsViewZoom;
 class BandageGraphicsScene;
+class QTabBar;
+class QStackedWidget;
+class QToolButton;
+struct GraphSession;
 class DeBruijnNode;
 class DeBruijnEdge;
 class GraphSearchDialog;
@@ -64,6 +69,13 @@ private:
     Ui::MainWindow *ui;
     BandageGraphicsScene * m_scene;
 
+    QTabBar * m_tabBar;
+    QStackedWidget * m_graphStack;
+    QToolButton * m_newTabButton;
+    std::vector<std::unique_ptr<GraphSession>> m_sessions;
+    int m_activeSession;
+    bool m_changingSession;
+
     GraphicsViewZoom * m_graphicsViewZoom;
     double m_previousZoomSpinBoxValue;
     double m_lastAbsoluteZoom;
@@ -75,6 +87,16 @@ private:
     bool m_alreadyShown;
 
     void cleanUp();
+    GraphSession * activeSession() const;
+    void setupTabs();
+    std::unique_ptr<GraphSession> createSession(bool adoptExistingGlobals);
+    void addSessionTab(std::unique_ptr<GraphSession> session, bool activate);
+    void activateSession(int index);
+    void closeTab(int index);
+    void saveActiveSessionState();
+    void updateTabTitle(GraphSession * session);
+    void switchSessionPage(GraphSession * session);
+    bool prepareForGraphLoad(const QString & fullFileName);
     void displayGraphDetails();
     void clearGraphDetails();
     void resetScene();
@@ -172,6 +194,10 @@ private slots:
     void selectNone();
     void invertSelection();
     void zoomToSelection();
+    void newTab();
+    void closeCurrentTab();
+    void tabChanged(int index);
+    void tabMoved(int from, int to);
     void straightenNodeOnDoubleClick(DeBruijnNode *node);
     void straightenSelectedNodes();
     void selectContiguous();

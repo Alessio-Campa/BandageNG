@@ -37,9 +37,19 @@ Memory::Memory()
     terminalWidth = 80;
 }
 
+namespace {
+QSettings persistentSettings()
+{
+    const QByteArray overrideFile = qgetenv("BANDAGE_SETTINGS_FILE");
+    if (!overrideFile.isEmpty())
+        return QSettings(QString::fromLocal8Bit(overrideFile), QSettings::IniFormat);
+    return QSettings("BandageNG", "BandageNG");
+}
+}
+
 void Memory::loadRememberedPath()
 {
-    QSettings settings("BandageNG", "BandageNG");
+    QSettings settings = persistentSettings();
     const QString path = settings.value("lastDirectory").toString();
     if (!path.isEmpty() && QDir(path).exists())
         rememberedPath = path;
@@ -47,7 +57,7 @@ void Memory::loadRememberedPath()
 
 void Memory::saveRememberedPath() const
 {
-    QSettings settings("BandageNG", "BandageNG");
+    QSettings settings = persistentSettings();
     settings.setValue("lastDirectory", rememberedPath);
 }
 

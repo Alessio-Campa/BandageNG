@@ -97,6 +97,12 @@ enum class TagMatchType {
     CsvIncludes
 };
 
+enum OpenGraphBehavior {
+    ASK_OPEN_BEHAVIOR,
+    OPEN_GRAPH_IN_NEW_TAB,
+    REPLACE_GRAPH_IN_CURRENT_TAB
+};
+
 struct TagColourRule {
     QString tagName;
     TagMatchType matchType = TagMatchType::Equals;
@@ -144,6 +150,7 @@ public:
     int rainbowPartsPerQuery;
 
     GraphScope graphScope;
+    OpenGraphBehavior openGraphBehavior;
     IntSetting nodeDistance;
     bool startingNodesExactMatch;
     QString startingNodes;

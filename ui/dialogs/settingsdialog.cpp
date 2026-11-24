@@ -267,6 +267,7 @@ void SettingsDialog::loadOrSaveSettingsToOrFromWidgets(bool setWidgets, Settings
         ui->positionVisibleRadioButton->setChecked(!settings->positionTextNodeCentre);
         ui->positionCentreRadioButton->setChecked(settings->positionTextNodeCentre);
         ui->colorMapCombo->setCurrentIndex(int(settings->colorMap));
+        ui->openGraphBehaviorComboBox->setCurrentIndex(int(settings->openGraphBehavior));
     }
     else
     {
@@ -281,6 +282,7 @@ void SettingsDialog::loadOrSaveSettingsToOrFromWidgets(bool setWidgets, Settings
             settings->nodeLengthMode = MANUAL_NODE_LENGTH;
         settings->positionTextNodeCentre = ui->positionCentreRadioButton->isChecked();
         settings->colorMap = ColorMap(ui->colorMapCombo->currentIndex());
+        settings->openGraphBehavior = OpenGraphBehavior(ui->openGraphBehaviorComboBox->currentIndex());
         settings->nodeColorer->reset();
     }
 }

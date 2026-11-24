@@ -48,6 +48,7 @@ set(LIB_SOURCES
     ui/dialogs/graphinfodialog.cpp
     ui/widgets/infotextwidget.cpp
     ui/mainwindow.cpp
+    ui/graphsession.cpp
     ui/bandagegraphicsscene.cpp
     ui/bandagegraphicsview.cpp
     ui/dialogs/myprogressdialog.cpp

@@ -29,8 +29,13 @@ Q_OBJECT
 public:
     explicit AnnotationsListWidget(QWidget *parent);
 
+    void setManager(AnnotationsManager * manager);
+
 public slots:
     void updateAnnotationGroups();
+
+private:
+    AnnotationsManager * m_manager = nullptr;
 };
 
 

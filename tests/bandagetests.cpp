@@ -36,6 +36,8 @@
 #include "command_line/settings.h"
 
 #include "ui/dialogs/settingsdialog.h"
+#include "ui/mainwindow.h"
+#include "ui/bandagegraphicsview.h"
 
 #include "graphsearch/graphsearch.h"
 #include "graphsearch/query.h"
@@ -48,6 +50,7 @@
 #include <QDebug>
 #include <QGraphicsScene>
 #include <QSettings>
+#include <QTabBar>
 #include <QTemporaryDir>
 
 #include <algorithm>
@@ -134,6 +137,7 @@ private slots:
     void settingsPersistence();
     void settingsDialog();
     void nodeEndHandles();
+    void mainWindowTabs();
     void commandLineSettings();
     void sciNotComparisons();
     void graphEdits();
@@ -1079,6 +1083,7 @@ void BandageTests::settingsPersistence() {
     saved.nodeDistance = 7;
     saved.startingNodes = "1+,2-";
     saved.nodeWidthZoomCompensation = 0.35;
+    saved.openGraphBehavior = OPEN_GRAPH_IN_NEW_TAB;
     saved.maxEValueProduct = SciNot(3.3, -7);
     saved.tagColourRules = {TagColourRule{"tag", TagMatchType::Contains, "value", QColor(1, 2, 3)}};
     saved.tagValueColours.insert(Settings::tagValueColourKey("tag", "value"), QColor(4, 5, 6));
@@ -1096,6 +1101,7 @@ void BandageTests::settingsPersistence() {
     QCOMPARE(loaded.nodeDistance.val, saved.nodeDistance.val);
     QCOMPARE(loaded.nodeWidthZoomCompensation.val,
              saved.nodeWidthZoomCompensation.val);
+    QCOMPARE(loaded.openGraphBehavior, saved.openGraphBehavior);
     QCOMPARE(loaded.startingNodes, saved.startingNodes);
     QCOMPARE(loaded.maxEValueProduct.val.getCoefficient(),
              saved.maxEValueProduct.val.getCoefficient());
@@ -1117,6 +1123,49 @@ void BandageTests::settingsDialog() {
     SettingsDialog dialog;
     dialog.setWidgetsFromSettings();
     dialog.setSettingsFromWidgets();
+}
+
+void BandageTests::mainWindowTabs() {
+    const QByteArray var = QByteArrayLiteral("BANDAGE_SETTINGS_FILE");
+    qputenv(var, m_tmpDir.filePath("mainwindow-settings.ini").toUtf8());
+
+    g_graphicsView = new BandageGraphicsView();
+    {
+        MainWindow w;
+        w.resize(1000, 700);
+        w.show();
+        QCoreApplication::processEvents();
+        auto *tabBar = w.findChild<QTabBar *>();
+        QVERIFY(tabBar);
+        QCOMPARE(tabBar->count(), 1);
+
+        QMetaObject::invokeMethod(&w, "loadGraph", Qt::DirectConnection,
+                                  Q_ARG(QString, testFile("test_components.gfa")));
+        QTRY_VERIFY_WITH_TIMEOUT(tabBar->tabText(0) != "New Tab", 30000);
+
+        QMetaObject::invokeMethod(&w, "newTab", Qt::DirectConnection);
+        QCoreApplication::processEvents();
+        QCOMPARE(tabBar->count(), 2);
+        QCOMPARE(tabBar->currentIndex(), 1);
+        QMetaObject::invokeMethod(&w, "closeCurrentTab", Qt::DirectConnection);
+        QCoreApplication::processEvents();
+        QCOMPARE(tabBar->count(), 1);
+        QCOMPARE(tabBar->tabText(0), QString("test_components.gfa"));
+
+        //Close the first/active tab with another tab remaining.
+        QMetaObject::invokeMethod(&w, "newTab", Qt::DirectConnection);
+        QCoreApplication::processEvents();
+        QCOMPARE(tabBar->count(), 2);
+        tabBar->setCurrentIndex(0);
+        QCoreApplication::processEvents();
+        QMetaObject::invokeMethod(&w, "closeCurrentTab", Qt::DirectConnection);
+        QCoreApplication::processEvents();
+        QCOMPARE(tabBar->count(), 1);
+        QCOMPARE(tabBar->tabText(0), QString("New Tab"));
+    }
+    g_graphicsView = nullptr;
+
+    qunsetenv(var);
 }
 
 void BandageTests::nodeEndHandles() {

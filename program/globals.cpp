@@ -26,9 +26,9 @@
 QSharedPointer<Settings> g_settings;
 QSharedPointer<Memory> g_memory;
 BandageGraphicsView * g_graphicsView;
-double g_absoluteZoom;
+double g_absoluteZoom = 1.0;
 double g_zoomReference = 1.0;
-std::unique_ptr<search::GraphSearch> g_graphSearch;
+std::shared_ptr<search::GraphSearch> g_graphSearch;
 QSharedPointer<AssemblyGraph> g_assemblyGraph;
 std::shared_ptr<AnnotationsManager> g_annotationsManager;
 

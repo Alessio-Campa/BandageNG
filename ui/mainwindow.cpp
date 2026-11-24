@@ -24,6 +24,7 @@
 #include "bandagegraphicsview.h"
 #include "graphicsviewzoom.h"
 #include "bandagegraphicsscene.h"
+#include "graphsession.h"
 #include "ui/dialogs/logandownloaddialog.h"
 #include "ui/dialogs/myprogressdialog.h"
 #include "ui/dialogs/pathspecifydialog.h"
@@ -83,6 +84,11 @@
 #include <QPixmap>
 #include <QStringListModel>
 #include <QToolBar>
+#include <QTabBar>
+#include <QStackedWidget>
+#include <QToolButton>
+#include <QCheckBox>
+#include <QSignalBlocker>
 #include <QtConcurrent>
 #include <QFutureWatcher>
 #include <QTimer>
@@ -260,7 +266,6 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     updateRecentFilesMenu();
 
     QApplication::setWindowIcon(QIcon(QPixmap(":/icons/icon.png")));
-    ui->graphicsViewWidget->layout()->addWidget(g_graphicsView);
 
     //The side panels can be resized by dragging the splitter handles. Extra
     //space (e.g. when resizing the window) should go to the graph view only.
@@ -292,8 +297,18 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
 
     setUiState(NO_GRAPH_LOADED);
 
-    m_graphicsViewZoom = new GraphicsViewZoom(g_graphicsView);
-    g_graphicsView->m_zoom = m_graphicsViewZoom;
+    m_tabBar = nullptr;
+    m_graphStack = nullptr;
+    m_newTabButton = nullptr;
+    m_activeSession = -1;
+    m_changingSession = false;
+    m_lastAbsoluteZoom = 1.0;
+
+    setupTabs();
+    addSessionTab(createSession(true), false);
+    m_activeSession = 0;
+    m_scene = m_sessions.front()->scene;
+    m_graphicsViewZoom = m_sessions.front()->zoom;
     m_lastAbsoluteZoom = g_absoluteZoom;
 
     //Always-visible sidebar-style button for collapsing/restoring the controls panel.
@@ -310,9 +325,6 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     //Merge the toolbar into the title bar, like native Mac apps.
     setUnifiedTitleAndToolBarOnMac(true);
 #endif
-
-    m_scene = new BandageGraphicsScene(this);
-    g_graphicsView->setScene(m_scene);
 
     //Nothing is selected yet, so this will hide the appropriate labels.
     selectionChanged();
@@ -420,6 +432,469 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
 }
 
 
+GraphSession *MainWindow::activeSession() const
+{
+    if (m_activeSession < 0 || m_activeSession >= int(m_sessions.size()))
+        return nullptr;
+    return m_sessions[m_activeSession].get();
+}
+
+void MainWindow::setupTabs()
+{
+    m_tabBar = ui->mainTabBar;
+    m_graphStack = ui->graphStack;
+    m_newTabButton = ui->newTabButton;
+
+    m_tabBar->setExpanding(false);
+    m_tabBar->setDocumentMode(false);
+    m_tabBar->setElideMode(Qt::ElideRight);
+    ui->tabBarWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    ui->tabBarWidget->setFixedHeight(34);
+    m_newTabButton->setAutoRaise(true);
+    m_newTabButton->setFixedSize(26, 26);
+    m_newTabButton->setStyleSheet(
+            "QToolButton { border: none; background: transparent; "
+            "color: palette(button-text); font-size: 18px; }");
+
+    connect(m_newTabButton, &QToolButton::clicked, this, &MainWindow::newTab);
+    connect(m_tabBar, &QTabBar::currentChanged, this, &MainWindow::tabChanged);
+    connect(m_tabBar, &QTabBar::tabCloseRequested, this,
+            [this](int index) { closeTab(index); });
+    connect(m_tabBar, &QTabBar::tabMoved, this, &MainWindow::tabMoved);
+
+    auto *newTabAction = new QAction(tr("New Tab"), this);
+    newTabAction->setShortcut(QKeySequence(QKeySequence::AddTab));
+    addAction(newTabAction);
+    connect(newTabAction, &QAction::triggered, this, &MainWindow::newTab);
+
+    auto *closeTabAction = new QAction(tr("Close Tab"), this);
+    closeTabAction->setShortcut(QKeySequence(QKeySequence::Close));
+    addAction(closeTabAction);
+    connect(closeTabAction, &QAction::triggered, this, &MainWindow::closeCurrentTab);
+
+    ui->menuFile->insertAction(ui->actionLoad_graph, newTabAction);
+    ui->menuFile->insertAction(ui->actionLoad_graph, closeTabAction);
+    ui->menuFile->insertSeparator(ui->actionLoad_graph);
+}
+
+std::unique_ptr<GraphSession> MainWindow::createSession(bool adoptExistingGlobals)
+{
+    auto session = std::make_unique<GraphSession>();
+
+    if (adoptExistingGlobals) {
+        session->graph = g_assemblyGraph;
+        session->annotations = g_annotationsManager;
+        session->search = g_graphSearch;
+        session->view = g_graphicsView;
+        session->graphScope = g_settings->graphScope;
+        session->nodeDistance = g_settings->nodeDistance;
+        session->startingNodesExactMatch = g_settings->startingNodesExactMatch;
+        session->startingNodes = g_settings->startingNodes;
+        session->minDepthRange = g_settings->minDepthRange;
+        session->maxDepthRange = g_settings->maxDepthRange;
+        session->colorScheme = g_settings->nodeColorer ? g_settings->nodeColorer->scheme()
+                                                       : RANDOM_COLOURS;
+        session->absoluteZoom = g_absoluteZoom;
+        session->zoomReference = g_zoomReference;
+        session->previousZoomSpinBoxValue = m_previousZoomSpinBoxValue;
+        session->lastAbsoluteZoom = m_lastAbsoluteZoom;
+        session->uiState = m_uiState;
+        session->displayNodeCustomLabels = g_settings->displayNodeCustomLabels;
+        session->displayNodeCsvData = g_settings->displayNodeCsvData;
+        session->displayNodeCsvDataCol = g_settings->displayNodeCsvDataCol;
+        session->annotationsSettings = g_settings->annotationsSettings;
+    } else {
+        session->graph = QSharedPointer<AssemblyGraph>::create();
+        session->annotations = std::make_shared<AnnotationsManager>();
+        session->search = search::GraphSearch::get(g_settings->graphSearcher);
+        session->view = new BandageGraphicsView();
+        session->graphScope = WHOLE_GRAPH;
+        session->nodeDistance = 0;
+        session->startingNodesExactMatch = true;
+        session->startingNodes.clear();
+        session->minDepthRange = 10.0;
+        session->maxDepthRange = 100.0;
+        session->colorScheme = RANDOM_COLOURS;
+        session->absoluteZoom = 1.0;
+        session->zoomReference = 1.0;
+        session->previousZoomSpinBoxValue = 100.0;
+        session->lastAbsoluteZoom = 1.0;
+        session->uiState = NO_GRAPH_LOADED;
+    }
+
+    session->scene = new BandageGraphicsScene();
+    session->view->setScene(session->scene);
+    session->zoom = new GraphicsViewZoom(session->view);
+    session->view->m_zoom = session->zoom;
+
+    session->startPage = new QWidget;
+    auto *startLayout = new QVBoxLayout(session->startPage);
+    startLayout->setContentsMargins(32, 32, 32, 32);
+    startLayout->addStretch();
+
+    auto *title = new QLabel(tr("No graph open"), session->startPage);
+    QFont titleFont = title->font();
+    titleFont.setPointSize(titleFont.pointSize() + 10);
+    titleFont.setBold(true);
+    title->setFont(titleFont);
+    title->setAlignment(Qt::AlignCenter);
+
+    auto *hint = new QLabel(tr("Use File → Load graph or the button below to open a graph in this tab."),
+                            session->startPage);
+    hint->setAlignment(Qt::AlignCenter);
+    hint->setWordWrap(true);
+
+    auto *openButton = new QPushButton(tr("Open graph…"), session->startPage);
+    openButton->setAutoDefault(false);
+    openButton->setDefault(false);
+    openButton->setMaximumWidth(180);
+    openButton->setStyleSheet(
+            "QPushButton { background-color: palette(button); "
+            "color: palette(button-text); padding: 6px 16px; }");
+    connect(openButton, &QPushButton::clicked, this, [this] { loadGraph(); });
+
+    startLayout->addWidget(title);
+    startLayout->addWidget(hint);
+    startLayout->addWidget(openButton, 0, Qt::AlignHCenter);
+    startLayout->addStretch();
+
+    session->page = new QStackedWidget;
+    session->page->addWidget(session->startPage);
+    session->page->addWidget(session->view);
+    session->page->setCurrentWidget(session->startPage);
+
+    return session;
+}
+
+void MainWindow::updateTabTitle(GraphSession *session)
+{
+    if (!session)
+        return;
+
+    for (int i = 0; i < int(m_sessions.size()); ++i) {
+        if (m_sessions[i].get() != session)
+            continue;
+
+        const QString title = session->fileName.isEmpty()
+                              ? tr("New Tab")
+                              : QFileInfo(session->fileName).fileName();
+        m_tabBar->setTabText(i, title);
+        m_tabBar->setTabToolTip(i, session->fileName);
+        break;
+    }
+}
+
+void MainWindow::addSessionTab(std::unique_ptr<GraphSession> session, bool activate)
+{
+    GraphSession *raw = session.get();
+    m_sessions.push_back(std::move(session));
+    m_graphStack->addWidget(raw->page);
+
+    QSignalBlocker blocker(m_tabBar);
+    const int index = m_tabBar->addTab(tr("New Tab"));
+    m_tabBar->setCurrentIndex(index);
+    updateTabTitle(raw);
+
+    if (activate)
+        activateSession(index);
+}
+
+void MainWindow::switchSessionPage(GraphSession *session)
+{
+    if (!session)
+        return;
+
+    m_graphStack->setCurrentWidget(session->page);
+    session->page->setCurrentWidget(session->uiState == NO_GRAPH_LOADED
+                                    ? session->startPage : session->view);
+}
+
+void MainWindow::saveActiveSessionState()
+{
+    GraphSession *session = activeSession();
+    if (!session)
+        return;
+
+    session->graphScope = GraphScope(ui->graphScopeComboBox->currentIndex());
+    session->nodeDistance = ui->nodeDistanceSpinBox->value();
+    session->startingNodesExactMatch = ui->startingNodesExactMatchRadioButton->isChecked();
+    session->startingNodes = ui->startingNodesLineEdit->text();
+    session->minDepthRange = ui->minDepthSpinBox->value();
+    session->maxDepthRange = ui->maxDepthSpinBox->value();
+    session->nodeWidth = ui->nodeWidthSpinBox->value();
+
+    session->pathSelection1 = ui->pathSelectionLineEdit->text();
+    session->pathSelection2 = ui->pathSelectionLineEdit2->text();
+    session->walkSelection1 = ui->walkSelectionLineEdit->text();
+    session->walkSelection2 = ui->walkSelectionLineEdit2->text();
+    session->selectionSearchText = ui->selectionSearchNodesLineEdit->text();
+    session->queryName = ui->queryComboBox->currentText();
+    session->tagName = ui->tagsComboBox->currentText();
+
+    session->displayNodeCustomLabels = g_settings->displayNodeCustomLabels;
+    session->displayNodeCsvData = g_settings->displayNodeCsvData;
+    session->displayNodeCsvDataCol = g_settings->displayNodeCsvDataCol;
+    session->annotationsSettings = g_settings->annotationsSettings;
+
+    session->colorScheme = g_settings->nodeColorer ? g_settings->nodeColorer->scheme()
+                                                   : RANDOM_COLOURS;
+    session->uiState = m_uiState;
+    session->absoluteZoom = g_absoluteZoom;
+    session->zoomReference = g_zoomReference;
+    session->previousZoomSpinBoxValue = m_previousZoomSpinBoxValue;
+    session->lastAbsoluteZoom = m_lastAbsoluteZoom;
+
+    session->userSpecifiedPath = g_memory->userSpecifiedPath;
+    session->userSpecifiedPathString = g_memory->userSpecifiedPathString;
+    session->userSpecifiedPathCircular = g_memory->userSpecifiedPathCircular;
+    session->queryPaths = g_memory->queryPaths;
+}
+
+void MainWindow::activateSession(int index)
+{
+    if (index < 0 || index >= int(m_sessions.size()) || index == m_activeSession)
+        return;
+
+    if (m_activeSession >= 0)
+        saveActiveSessionState();
+
+    GraphSession *session = m_sessions[index].get();
+    m_changingSession = true;
+    m_activeSession = index;
+
+    g_assemblyGraph = session->graph;
+    g_annotationsManager = session->annotations;
+    g_graphSearch = session->search;
+    g_graphicsView = session->view;
+    g_absoluteZoom = session->absoluteZoom;
+    g_zoomReference = session->zoomReference;
+
+    m_scene = session->scene;
+    m_graphicsViewZoom = session->zoom;
+    m_uiState = UiState(session->uiState);
+    m_previousZoomSpinBoxValue = session->previousZoomSpinBoxValue;
+    m_lastAbsoluteZoom = session->lastAbsoluteZoom;
+
+    g_settings->graphScope = session->graphScope;
+    g_settings->nodeDistance = session->nodeDistance;
+    g_settings->startingNodesExactMatch = session->startingNodesExactMatch;
+    g_settings->startingNodes = session->startingNodes;
+    g_settings->minDepthRange = session->minDepthRange;
+    g_settings->maxDepthRange = session->maxDepthRange;
+    g_settings->displayNodeCustomLabels = session->displayNodeCustomLabels;
+    g_settings->displayNodeCsvData = session->displayNodeCsvData;
+    g_settings->displayNodeCsvDataCol = session->displayNodeCsvDataCol;
+    g_settings->annotationsSettings = session->annotationsSettings;
+    g_settings->initializeColorer(session->colorScheme);
+
+    g_memory->userSpecifiedPath = session->userSpecifiedPath;
+    g_memory->userSpecifiedPathString = session->userSpecifiedPathString;
+    g_memory->userSpecifiedPathCircular = session->userSpecifiedPathCircular;
+    g_memory->queryPaths = session->queryPaths;
+
+    if (m_graphSearchDialog && m_graphSearchDialog != session->searchDialog) {
+        m_graphSearchDialog->blockSignals(true);
+        m_graphSearchDialog->hide();
+    }
+    m_graphSearchDialog = session->searchDialog;
+    if (m_graphSearchDialog)
+        m_graphSearchDialog->blockSignals(false);
+
+    switchSessionPage(session);
+
+    setWidgetsFromSettings();
+
+    ui->nodeCustomLabelsCheckBox->setChecked(session->displayNodeCustomLabels);
+    ui->csvCheckBox->setChecked(session->displayNodeCsvData);
+
+    ui->pathSelectionLineEdit->setText(session->pathSelection1);
+    ui->pathSelectionLineEdit2->setText(session->pathSelection2);
+    ui->walkSelectionLineEdit->setText(session->walkSelection1);
+    ui->walkSelectionLineEdit2->setText(session->walkSelection2);
+    ui->selectionSearchNodesLineEdit->setText(session->selectionSearchText);
+
+    {
+        QSignalBlocker blocker(ui->nodeWidthSpinBox);
+        ui->nodeWidthSpinBox->setValue(session->nodeWidth);
+    }
+
+    ui->csvComboBox->clear();
+    if (!g_assemblyGraph->m_csvHeaders.empty()) {
+        ui->csvComboBox->addItems(g_assemblyGraph->m_csvHeaders);
+        ui->csvComboBox->setEnabled(true);
+        ui->csvComboBox->setCurrentIndex(std::clamp(session->displayNodeCsvDataCol, 0,
+                                                    int(g_assemblyGraph->m_csvHeaders.size()) - 1));
+    } else {
+        ui->csvComboBox->setEnabled(false);
+    }
+
+    if (m_graphSearchDialog)
+        setupQueryComboBox();
+    else {
+        ui->queryComboBox->clear();
+        ui->queryComboBox->addItem("none");
+        ui->queryComboBox->setEnabled(false);
+    }
+    if (!session->queryName.isEmpty()) {
+        const int queryIndex = ui->queryComboBox->findText(session->queryName);
+        if (queryIndex >= 0)
+            ui->queryComboBox->setCurrentIndex(queryIndex);
+    }
+
+    ui->annotationsListWidget->setManager(g_annotationsManager.get());
+
+    if (session->uiState == NO_GRAPH_LOADED) {
+        clearGraphDetails();
+    } else {
+        displayGraphDetails();
+    }
+
+    updateZoomSpinBox();
+    setUiState(UiState(session->uiState));
+    graphScopeChanged();
+    switchColourScheme();
+    if (!session->tagName.isEmpty()) {
+        const int tagIndex = ui->tagsComboBox->findText(session->tagName);
+        if (tagIndex >= 0)
+            ui->tagsComboBox->setCurrentIndex(tagIndex);
+    }
+    selectionChanged();
+
+    setWindowTitle(session->fileName.isEmpty()
+                   ? "BandageNG"
+                   : "BandageNG - " + session->fileName);
+
+    {
+        QSignalBlocker blocker(m_tabBar);
+        m_tabBar->setCurrentIndex(index);
+    }
+
+    m_changingSession = false;
+    session->view->setFocus();
+}
+
+bool MainWindow::prepareForGraphLoad(const QString &fullFileName)
+{
+    if (!activeSession())
+        newTab();
+
+    if (m_uiState == NO_GRAPH_LOADED)
+        return true;
+
+    OpenGraphBehavior behavior = g_settings->openGraphBehavior;
+    if (behavior == ASK_OPEN_BEHAVIOR) {
+        QMessageBox box(this);
+        box.setWindowTitle(tr("Open graph"));
+        box.setText(tr("This tab already contains a graph."));
+        box.setInformativeText(tr("Where should \"%1\" be opened?")
+                               .arg(QFileInfo(fullFileName).fileName()));
+        auto *newTabButton = box.addButton(tr("Open in New Tab"), QMessageBox::AcceptRole);
+        box.addButton(tr("Replace Current Tab"), QMessageBox::DestructiveRole);
+        box.addButton(QMessageBox::Cancel);
+        box.setDefaultButton(newTabButton);
+        auto *checkBox = new QCheckBox(tr("Do not show this prompt again"), &box);
+        box.setCheckBox(checkBox);
+        box.exec();
+
+        if (box.clickedButton() == nullptr || box.buttonRole(box.clickedButton()) == QMessageBox::RejectRole)
+            return false;
+
+        const bool openInNewTab = box.clickedButton() == newTabButton;
+        if (checkBox->isChecked()) {
+            g_settings->openGraphBehavior = openInNewTab ? OPEN_GRAPH_IN_NEW_TAB
+                                                         : REPLACE_GRAPH_IN_CURRENT_TAB;
+            g_settings->savePersisted();
+        }
+
+        if (openInNewTab)
+            newTab();
+        return true;
+    }
+
+    if (behavior == OPEN_GRAPH_IN_NEW_TAB)
+        newTab();
+
+    return true;
+}
+
+void MainWindow::newTab()
+{
+    addSessionTab(createSession(false), true);
+}
+
+void MainWindow::closeCurrentTab()
+{
+    closeTab(m_activeSession);
+}
+
+void MainWindow::closeTab(int index)
+{
+    if (index < 0 || index >= int(m_sessions.size()))
+        return;
+
+    if (m_sessions.size() == 1) {
+        close();
+        return;
+    }
+
+    const bool closingActive = index == m_activeSession;
+    int newActive = m_activeSession;
+
+    if (closingActive)
+        newActive = index + 1 < int(m_sessions.size()) ? index : index - 1;
+    else if (index < m_activeSession)
+        --newActive;
+
+    m_graphStack->removeWidget(m_sessions[index]->page);
+
+    {
+        QSignalBlocker blocker(m_tabBar);
+        m_tabBar->removeTab(index);
+    }
+
+    if (closingActive) {
+        if (m_graphSearchDialog == m_sessions[index]->searchDialog)
+            m_graphSearchDialog = nullptr;
+        //The annotations widget still points at this session's manager, so
+        //detach it before the session is destroyed.
+        ui->annotationsListWidget->setManager(nullptr);
+        m_activeSession = -1;
+    }
+
+    m_sessions.erase(m_sessions.begin() + index);
+
+    if (closingActive) {
+        activateSession(newActive);
+    } else {
+        m_activeSession = newActive;
+    }
+}
+
+void MainWindow::tabChanged(int index)
+{
+    if (m_changingSession || index < 0)
+        return;
+    activateSession(index);
+}
+
+void MainWindow::tabMoved(int from, int to)
+{
+    if (from == to || from < 0 || to < 0 ||
+        from >= int(m_sessions.size()) || to >= int(m_sessions.size()))
+        return;
+
+    auto session = std::move(m_sessions[from]);
+    m_sessions.erase(m_sessions.begin() + from);
+    m_sessions.insert(m_sessions.begin() + to, std::move(session));
+
+    if (m_activeSession == from)
+        m_activeSession = to;
+    else if (from < m_activeSession && to >= m_activeSession)
+        --m_activeSession;
+    else if (from > m_activeSession && to <= m_activeSession)
+        ++m_activeSession;
+}
+
 // This function runs after the MainWindow has been shown.  This code is not
 // included in the constructor because it can perform a graph search, which
 // will fill the query combo box and screw up widget sizes.
@@ -450,14 +925,13 @@ void MainWindow::afterMainWindowShow() {
 }
 
 MainWindow::~MainWindow() {
-    //Remember the user's options for the next session (before cleanUp() resets
-    //some graph-specific values).
+    //Remember the user's options for the next session.
     saveSettingsFromWidgets();
+    saveActiveSessionState();
     g_settings->savePersisted();
     g_memory->saveRememberedPath();
 
-    cleanUp();
-    delete m_graphicsViewZoom;
+    m_sessions.clear();
     delete ui;
 }
 
@@ -468,12 +942,16 @@ void MainWindow::cleanUp() {
 
     if (m_graphSearchDialog) {
         m_graphSearchDialog->search()->cleanUp();
+        if (GraphSession *session = activeSession()) {
+            if (session->searchDialog == m_graphSearchDialog)
+                session->searchDialog = nullptr;
+        }
         delete m_graphSearchDialog;
         m_graphSearchDialog = nullptr;
     }
 
     g_assemblyGraph->cleanUp();
-    setWindowTitle("Bandage-NG");
+    setWindowTitle("BandageNG");
 
     g_annotationsManager->cleanUp();
 
@@ -548,6 +1026,9 @@ void MainWindow::loadGraph(QString fullFileName) {
     if (fullFileName.isEmpty()) //User did hit cancel
         return;
 
+    if (!prepareForGraphLoad(fullFileName))
+        return;
+
     // We need to convert unique_ptr to shared_ptr in order to get builder shared between future and callback
     std::shared_ptr<io::AssemblyGraphBuilder> builder = io::AssemblyGraphBuilder::get(fullFileName);
     if (!builder) {
@@ -581,6 +1062,13 @@ void MainWindow::loadGraph(QString fullFileName) {
                     cleanUp();
                     clearGraphDetails();
                     setUiState(NO_GRAPH_LOADED);
+                    if (GraphSession *session = activeSession()) {
+                        session->fileName.clear();
+                        session->uiState = NO_GRAPH_LOADED;
+                        updateTabTitle(session);
+                        switchSessionPage(session);
+                    }
+                    setWindowTitle("BandageNG");
                     return;
                 }
 
@@ -595,6 +1083,12 @@ void MainWindow::loadGraph(QString fullFileName) {
 
                 setUiState(GRAPH_LOADED);
                 setWindowTitle("BandageNG - " + fullFileName);
+                if (GraphSession *session = activeSession()) {
+                    session->fileName = fullFileName;
+                    session->uiState = GRAPH_LOADED;
+                    updateTabTitle(session);
+                    switchSessionPage(session);
+                }
 
                 g_assemblyGraph->determineGraphInfo();
                 displayGraphDetails();
@@ -1376,6 +1870,11 @@ void MainWindow::graphLayoutFinished(const GraphLayout &layout) {
     selectionChanged();
 
     setUiState(GRAPH_DRAWN);
+    if (GraphSession *session = activeSession()) {
+        session->uiState = GRAPH_DRAWN;
+        switchSessionPage(session);
+        updateTabTitle(session);
+    }
 
     //Move the focus to the view so the user can use keyboard controls to navigate.
     g_graphicsView->setFocus();
@@ -1383,19 +1882,24 @@ void MainWindow::graphLayoutFinished(const GraphLayout &layout) {
 
 
 void MainWindow::resetScene() {
-    m_scene->blockSignals(true);
+    GraphSession *session = activeSession();
+    if (!session)
+        return;
+
+    session->scene->blockSignals(true);
 
     g_assemblyGraph->resetEdges();
 
-    g_graphicsView->setScene(nullptr);
-    delete m_scene;
-    m_scene = new BandageGraphicsScene(this);
+    session->view->setScene(nullptr);
+    delete session->scene;
+    session->scene = new BandageGraphicsScene();
+    m_scene = session->scene;
 
-    g_graphicsView->setScene(m_scene);
-    connect(m_scene, SIGNAL(selectionChanged()), this, SLOT(selectionChanged()));
+    session->view->setScene(session->scene);
+    connect(session->scene, SIGNAL(selectionChanged()), this, SLOT(selectionChanged()));
     selectionChanged();
 
-    g_graphicsView->undoRotation();
+    session->view->undoRotation();
 }
 
 
@@ -2352,6 +2856,8 @@ void MainWindow::openGraphSearchDialog() {
     // If a graph search dialog does not currently exist, make it.
     if (!m_graphSearchDialog) {
         m_graphSearchDialog = new GraphSearchDialog(this);
+        if (GraphSession *session = activeSession())
+            session->searchDialog = m_graphSearchDialog;
         connect(m_graphSearchDialog, SIGNAL(changed()), this, SLOT(graphSearchChanged()));
         connect(m_graphSearchDialog, SIGNAL(queryPathSelectionChanged()), g_graphicsView->viewport(), SLOT(update()));
     }
@@ -3201,6 +3707,10 @@ void MainWindow::cleanUpGraphSearch() {
     ui->queryComboBox->clear();
 
     if (m_graphSearchDialog) {
+        if (GraphSession *session = activeSession()) {
+            if (session->searchDialog == m_graphSearchDialog)
+                session->searchDialog = nullptr;
+        }
         delete m_graphSearchDialog;
         m_graphSearchDialog = nullptr;
     }

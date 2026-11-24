@@ -57,6 +57,7 @@ Settings::Settings()
     rainbowPartsPerQuery = 100;
 
     graphScope = WHOLE_GRAPH;
+    openGraphBehavior = ASK_OPEN_BEHAVIOR;
     nodeDistance = IntSetting(0, 0, 100);
     startingNodesExactMatch = true;
     startingNodes = "";
@@ -390,6 +391,8 @@ void Settings::loadPersisted()
     loadValue(settings, "positionTextNodeCentre", positionTextNodeCentre);
 
     loadEnum(settings, "graphScope", graphScope, int(WHOLE_GRAPH), int(AROUND_COMPONENT));
+    loadEnum(settings, "openGraphBehavior", openGraphBehavior,
+             int(ASK_OPEN_BEHAVIOR), int(REPLACE_GRAPH_IN_CURRENT_TAB));
     //Scopes which depend on transient data (queries, paths, walks) fall back to
     //the whole graph, since that data does not exist yet in a fresh session.
     if (graphScope == AROUND_PATHS || graphScope == AROUND_WALKS ||
@@ -541,6 +544,7 @@ void Settings::savePersisted() const
     saveValue(settings, "positionTextNodeCentre", positionTextNodeCentre);
 
     saveEnum(settings, "graphScope", int(graphScope));
+    saveEnum(settings, "openGraphBehavior", int(openGraphBehavior));
     saveInt(settings, "nodeDistance", nodeDistance);
     saveValue(settings, "startingNodesExactMatch", startingNodesExactMatch);
     saveValue(settings, "startingNodes", startingNodes);

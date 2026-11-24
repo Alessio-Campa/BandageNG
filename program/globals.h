@@ -43,7 +43,7 @@ extern QSharedPointer<Memory> g_memory;
 extern BandageGraphicsView * g_graphicsView;
 extern double g_absoluteZoom;
 extern double g_zoomReference;
-extern std::unique_ptr<search::GraphSearch> g_graphSearch;
+extern std::shared_ptr<search::GraphSearch> g_graphSearch;
 extern QSharedPointer<AssemblyGraph> g_assemblyGraph;
 extern std::shared_ptr<AnnotationsManager> g_annotationsManager;
 

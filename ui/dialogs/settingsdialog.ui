@@ -4866,6 +4866,123 @@
             </widget>
            </item>
            <item>
+            <widget class="QLabel" name="tabsHeadingLabel">
+             <property name="font">
+              <font>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>Tabs</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="tabsDescriptionLabel">
+             <property name="text">
+              <string>Controls what happens when a graph is opened while the current tab already contains a graph.</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignJustify|Qt::AlignVCenter</set>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="Line" name="tabsLine">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="tabsWidget" native="true">
+             <layout class="QHBoxLayout" name="tabsLayout">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="openGraphBehaviorLabel">
+                <property name="text">
+                 <string>Open graph in non-empty tab:</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="openGraphBehaviorComboBox">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>Ask every time</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Open in a new tab</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Replace current tab</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item>
+               <spacer name="openGraphBehaviorSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeType">
+                 <enum>QSizePolicy::Expanding</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>0</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <widget class="InfoTextWidget" name="openGraphBehaviorInfoText" native="true">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>16</width>
+                  <height>16</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>This is the same choice as the &quot;Do not show this prompt again&quot; checkbox shown when opening a graph into a non-empty tab.</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
             <spacer name="verticalSpacer_12">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -5046,6 +5163,7 @@
   <tabstop>maxLengthBaseDiscrepancyCheckBox</tabstop>
   <tabstop>maxLengthBaseDiscrepancySpinBox</tabstop>
   <tabstop>recentFilesLimitComboBox</tabstop>
+  <tabstop>openGraphBehaviorComboBox</tabstop>
   <tabstop>restoreDefaultsButton</tabstop>
  </tabstops>
  <resources/>

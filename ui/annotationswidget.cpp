@@ -68,11 +68,12 @@ AnnotationSettingsDialog::AnnotationSettingsDialog(const AnnotationGroup &annota
 
 
 AnnotationsListWidget::AnnotationsListWidget(QWidget *parent) : QListWidget(parent) {
-    connect(g_annotationsManager.get(), &AnnotationsManager::annotationGroupsUpdated,
-            this, &AnnotationsListWidget::updateAnnotationGroups);
+    setManager(g_annotationsManager.get());
 
     connect(this, &QListWidget::itemDoubleClicked, [this](QListWidgetItem *listWidgetItem) {
-        const auto &annotationGroupPtr = *g_annotationsManager->findGroupById(
+        if (!m_manager)
+            return;
+        const auto &annotationGroupPtr = *m_manager->findGroupById(
                 listWidgetItem->data(Qt::UserRole).value<AnnotationGroupId>());
         auto *settingsDialog = new AnnotationSettingsDialog(annotationGroupPtr, this);
         settingsDialog->open();
@@ -80,10 +81,30 @@ AnnotationsListWidget::AnnotationsListWidget(QWidget *parent) : QListWidget(pare
 }
 
 
+void AnnotationsListWidget::setManager(AnnotationsManager *manager) {
+    if (m_manager == manager)
+        return;
+
+    if (m_manager)
+        disconnect(m_manager, &AnnotationsManager::annotationGroupsUpdated,
+                   this, &AnnotationsListWidget::updateAnnotationGroups);
+
+    m_manager = manager;
+
+    if (m_manager)
+        connect(m_manager, &AnnotationsManager::annotationGroupsUpdated,
+                this, &AnnotationsListWidget::updateAnnotationGroups);
+
+    updateAnnotationGroups();
+}
+
+
 void AnnotationsListWidget::updateAnnotationGroups() {
     clear();
-    for (const auto &annotationGroupPtr: g_annotationsManager->getGroups()) {
-        auto &setting = g_settings->annotationsSettings[annotationGroupPtr->id];
+    if (!m_manager)
+        return;
+
+    for (const auto &annotationGroupPtr: m_manager->getGroups()) {
         auto *listWidgetItem = new QListWidgetItem(annotationGroupPtr->name);
         addItem(listWidgetItem);
         listWidgetItem->setData(Qt::UserRole, annotationGroupPtr->id);
